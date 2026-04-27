@@ -49,7 +49,7 @@ target_sources(${LIBNAME}
     PRIVATE
     src/register_types.cpp
     src/register_types.h
-    src/HorrorCamera.h
+    src/HorrorCamera.hpp
     src/HorrorCamera.cpp
 )
 

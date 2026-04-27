@@ -1,7 +1,18 @@
 #pragma once
 
 #include <godot_cpp/classes/node3d.hpp>
-#include <godot_cpp/godot.hpp>
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/variant/plane.hpp>
+#include <godot_cpp/variant/projection.hpp>
+#include <godot_cpp/variant/rid.hpp>
+#include <godot_cpp/variant/transform3d.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
+#include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector3.hpp>
+
+#include <godot_cpp/core/class_db.hpp>
+
+#include <type_traits>
 
 namespace godot {
 
@@ -23,14 +34,13 @@ typedef struct {
 	float zmin;
 	float zmax;
 	float pad[2];
-	// ToDo: Find proper matrix types for these
-	Vector4 vs[4];
-	Vector4 vc[4];
-	Vector4 vcv[4];
-	Vector4 wv[4];
-	Vector4 ws[4];
-	Vector4 wc[4];
-	Vector4 wcv[4];
+	Projection vs;
+	Projection vc;
+	Projection vcv;
+	Projection wv;
+	Projection ws;
+	Projection wc;
+	Projection wcv;
 	Vector4 zd;
 	Vector4 yd;
 } SgCAMERA;
@@ -42,8 +52,8 @@ typedef struct {
 	u_short p1[3];
 	u_short p2[3];
 	u_short p3[3];
-	float roll[2];
-	float fov[2];
+	Vector2 roll;
+	Vector2 fov;
 } MAP_CAM_DAT;
 
 typedef struct {
@@ -71,11 +81,27 @@ protected:
 
 private:
 	void _on_camera_input(const Ref<InputEvent> &event);
+	bool isActive;
+
+	int drm_cam_req;
+	int drm_cam_tm;
 
 public:
 	void _ready() override;
 	void _process(double delta) override;
 	void print_type(const Variant &p_variant) const;
+
+	void SetCamPos0(SgCAMERA *tc, MAP_CAM_INFO *mci);
+	void SetCamPos1(SgCAMERA *tc, MAP_CAM_INFO *mci);
+	void SetCamPos2(SgCAMERA *tc, MAP_CAM_INFO *mci);
+	void SetCamPos3(SgCAMERA *tc, MAP_CAM_INFO *mci);
+	void SetCamPos4(SgCAMERA *tc, MAP_CAM_INFO *mci);
+	void SetCamPos5(SgCAMERA *tc, MAP_CAM_INFO *mci);
+
+	void NormalCameraCtrl();
+
+	void DramaCameraReqCtrl();
+	void ClearDramaCamReq();
 };
 
 } //namespace godot

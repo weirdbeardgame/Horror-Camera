@@ -5,7 +5,7 @@
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
-#include "HorrorCamera.h"
+#include "HorrorCamera.hpp"
 
 using namespace godot;
 
