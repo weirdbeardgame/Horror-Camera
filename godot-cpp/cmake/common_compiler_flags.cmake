@@ -47,7 +47,7 @@ by default, we need to test for it. ]]
 function(compiler_detection)
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
         if(${CMAKE_CXX_COMPILER_FRONTEND_VARIANT} STREQUAL MSVC)
-            message("Using clang-cl")
+            message(STATUS "Using clang-cl")
             set(IS_CLANG "0" PARENT_SCOPE)
             set(IS_MSVC "1" PARENT_SCOPE)
             set(NOT_MSVC "0" PARENT_SCOPE)
@@ -66,9 +66,6 @@ function(common_compiler_flags)
         # The public flag tells CMake that the following options are transient,
         # and will propagate to consumers.
         PUBLIC
-            # Disable exception handling. Godot doesn't use exceptions anywhere, and this
-            # saves around 20% of binary size and very significant build time.
-            $<${DISABLE_EXCEPTIONS}:$<${NOT_MSVC}:-fno-exceptions>>
 
             # Enabling Debug Symbols
             $<${DEBUG_SYMBOLS}:
@@ -95,6 +92,9 @@ function(common_compiler_flags)
 
         # Warnings below, these do not need to propagate to consumers.
         PRIVATE
+            # Disable exception handling. Godot doesn't use exceptions anywhere, and this
+            # saves around 20% of binary size and very significant build time.
+            $<${DISABLE_EXCEPTIONS}:$<${NOT_MSVC}:-fno-exceptions>>
             $<${IS_MSVC}:
                 /W4      # Warning level 4 (informational) warnings that aren't off by default.
 
@@ -159,7 +159,7 @@ function(common_compiler_flags)
             GDEXTENSION
 
             # features
-            $<${DEBUG_FEATURES}:DEBUG_ENABLED DEBUG_METHODS_ENABLED>
+            $<${DEBUG_FEATURES}:DEBUG_ENABLED>
 
             $<${IS_DEV_BUILD}:DEV_ENABLED>
 
@@ -170,6 +170,8 @@ function(common_compiler_flags)
             $<${IS_MSVC}:$<${DISABLE_EXCEPTIONS}:_HAS_EXCEPTIONS=0>>
 
             $<${THREADS_ENABLED}:THREADS_ENABLED>
+
+            $<$<NOT:$<BOOL:${GODOTCPP_DEPRECATED}>>:DISABLE_DEPRECATED>
     )
 
     target_link_options(

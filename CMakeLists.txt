@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.17)
 if(CMAKE_C_COMPILER)
 endif()
 
-set(LIBNAME "HorrorCamera") # "The name of the library"
+set(LIBNAME "SgCamera") # "The name of the library"
 set(GODOT_PROJECT_DIR "project" CACHE STRING "The directory of a Godot project folder")
 
 # Make sure all the dependencies are satisfied
@@ -26,6 +26,19 @@ if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/godot-cpp/src")
 endif()
 add_subdirectory(godot-cpp SYSTEM)
 
+    set(GODOTCPP_LATEST_API_VERSION "4.6")
+    if(GODOTCPP_API_VERSION STREQUAL "" OR GODOTCPP_API_VERSION STREQUAL GODOTCPP_LATEST_API_VERSION)
+        set(GODOTCPP_GDEXTENSION_API_FILE "${GODOTCPP_GDEXTENSION_DIR}/extension_api.json")
+    else()
+        string(REPLACE "." "-" GODOTCPP_API_VERSION_DASHED "${GODOTCPP_API_VERSION}")
+        set(GODOTCPP_GDEXTENSION_API_FILE
+            "${GODOTCPP_GDEXTENSION_DIR}/extension_api-${GODOTCPP_API_VERSION_DASHED}.json"
+        )
+    endif()
+    if(GODOTCPP_CUSTOM_API_FILE) # User-defined override.
+        set(GODOTCPP_GDEXTENSION_API_FILE "${GODOTCPP_CUSTOM_API_FILE}")
+    endif()
+
 # Add godot-cpp's module path and include the exported functions.
 # This is made available for documentation generation
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${godot-cpp_SOURCE_DIR}/cmake")
@@ -36,10 +49,10 @@ get_target_property(GODOTCPP_SUFFIX godot::cpp GODOTCPP_SUFFIX)
 get_target_property(GODOTCPP_PLATFORM godot::cpp GODOTCPP_PLATFORM)
 
 # Now we can specify our own project which will inherit any global cmake properties or variables that have been defined.
-project(godot-cpp-template
+project(SgCamera
     VERSION 1.0
-    DESCRIPTION "This repository serves as a quickstart template for GDExtension development with Godot 4.0+."
-    HOMEPAGE_URL "https://github.com/enetheru/godot-cpp-template/tree/main"
+    DESCRIPTION "This is an implementation of the camera system from the fatal frame games in Godot"
+    HOMEPAGE_URL "https://github.com/weirdbeardgame/Horror-Camera.git"
     LANGUAGES CXX
 )
 
@@ -48,9 +61,11 @@ add_library(${LIBNAME} SHARED)
 target_sources(${LIBNAME}
     PRIVATE
     src/register_types.cpp
-    src/register_types.h
-    src/HorrorCamera.hpp
-    src/HorrorCamera.cpp
+    src/camera/SgCamera.cpp
+    src/camera/MapCamDat.cpp
+    src/camera/CameraEffects.cpp
+    src/editor/CameraPlugin.cpp
+    src/plyr_ctl.cpp
 )
 
 # Fetch a list of the xml files to use for documentation and add to our target
@@ -64,6 +79,8 @@ if(DOC_XML)
 endif()
 
 target_link_libraries(${LIBNAME} PRIVATE godot-cpp)
+
+target_include_directories(SgCamera PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 
 # Require at least C++17 for this target
 set_property(TARGET ${LIBNAME} PROPERTY CXX_STANDARD 17)

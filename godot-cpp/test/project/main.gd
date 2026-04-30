@@ -8,6 +8,8 @@ class TestClass:
 
 func _ready():
 	var example: Example = $Example
+	var godot_target_version := example.get_godot_target_version()
+	var godot_runtime_version := Engine.get_version_info()
 
 	# Timing of set instance binding.
 	assert_equal(example.is_object_binding_set_by_parent_constructor(), true)
@@ -18,8 +20,7 @@ func _ready():
 
 	# To string.
 	assert_equal(example.to_string(),'[ GDExtension::Example <--> Instance ID:%s ]' % example.get_instance_id())
-	# It appears there's a bug with instance ids :-(
-	#assert_equal($Example/ExampleMin.to_string(), 'ExampleMin:[Wrapped:%s]' % $Example/ExampleMin.get_instance_id())
+	assert_equal($Example/ExampleMin.to_string(), 'ExampleMin:<ExampleMin#%s>' % $Example/ExampleMin.get_instance_id())
 
 	# Call static methods.
 	assert_equal(Example.test_static(9, 100), 109);
@@ -43,6 +44,7 @@ func _ready():
 	# Pass custom reference.
 	assert_equal(example.custom_ref_func(null), -1)
 	var ref1 = ExampleRef.new()
+	assert_equal(ref1.get_reference_count(), 1)
 	ref1.id = 27
 	assert_equal(example.custom_ref_func(ref1), 27)
 	ref1.id += 1;
@@ -62,6 +64,7 @@ func _ready():
 	assert_equal(null_ref, null)
 	var ret_ref = example.return_extended_ref()
 	assert_not_equal(ret_ref.get_instance_id(), 0)
+	assert_equal(ret_ref.get_reference_count(), 1)
 	assert_equal(ret_ref.get_id(), 0)
 	assert_equal(example.get_v4(), Vector4(1.2, 3.4, 5.6, 7.8))
 	assert_equal(example.test_node_argument(example), example)
@@ -85,9 +88,10 @@ func _ready():
 	var array: Array[int] = [1, 2, 3]
 	assert_equal(example.test_tarray_arg(array), 6)
 	assert_equal(example.test_dictionary(), { "hello": "world", "foo": "bar" })
-	assert_equal(example.test_tdictionary(), { Vector2(1, 2): Vector2i(2, 3) })
-	var dictionary: Dictionary[String, int] = { "1": 1, "2": 2, "3": 3 }
-	assert_equal(example.test_tdictionary_arg(dictionary), 6)
+
+	if godot_target_version["minor"] >= 4:
+		var test = load("res://test_typed_dictionary.gd").new()
+		test.test_typed_dictionary(self, example)
 
 	example.callable_bind()
 	assert_equal(custom_signal_emitted, ["bound", 11])
@@ -209,11 +213,12 @@ func _ready():
 	assert_equal(example.test_variant_float_conversion(10.0), 10.0)
 	assert_equal(example.test_variant_float_conversion(10), 10.0)
 
-	# Test checking if objects are valid.
-	var object_of_questionable_validity = Object.new()
-	assert_equal(example.test_object_is_valid(object_of_questionable_validity), true)
-	object_of_questionable_validity.free()
-	assert_equal(example.test_object_is_valid(object_of_questionable_validity), false)
+	if godot_target_version["minor"] >= 4:
+		# Test checking if objects are valid.
+		var object_of_questionable_validity = Object.new()
+		assert_equal(example.test_object_is_valid(object_of_questionable_validity), true)
+		object_of_questionable_validity.free()
+		assert_equal(example.test_object_is_valid(object_of_questionable_validity), false)
 
 	# Test that ptrcalls from GDExtension to the engine are correctly encoding Object and RefCounted.
 	var new_node = Node.new()
@@ -225,6 +230,9 @@ func _ready():
 	example.test_set_tileset(new_tilemap, new_tileset)
 	assert_equal(new_tilemap.tile_set, new_tileset)
 	new_tilemap.queue_free()
+
+	# Creates a Tween and checks that it's valid. Improper refcount handling will crash now or at shutdown.
+	assert_equal(example.test_tween_smoke_test(), true)
 
 	# Test variant call.
 	var test_obj = TestClass.new()
@@ -271,8 +279,9 @@ func _ready():
 	# Test that we can access an engine singleton.
 	assert_equal(example.test_use_engine_singleton(), OS.get_name())
 
-	assert_equal(example.test_get_internal(1), 1)
-	assert_equal(example.test_get_internal(true), -1)
+	if godot_target_version["minor"] >= 4:
+		assert_equal(example.test_get_internal(1), 1)
+		assert_equal(example.test_get_internal(true), -1)
 
 	# Test that notifications happen on both parent and child classes.
 	var example_child = $ExampleChild
@@ -288,9 +297,18 @@ func _ready():
 	assert_equal(library_path, ProjectSettings.globalize_path(library_path))
 	assert_equal(FileAccess.file_exists(library_path), true)
 
-	# Test a class with a unicode name.
-	var przykład = ExamplePrzykład.new()
-	assert_equal(przykład.get_the_word(), "słowo to przykład")
+	if godot_target_version["minor"] >= 5:
+		# Test that internal classes work as expected (at least for Godot 4.5+).
+		assert_equal(ClassDB.can_instantiate("ExampleInternal"), false)
+		assert_equal(ClassDB.instantiate("ExampleInternal"), null)
+		var internal_class = example.test_get_internal_class()
+		assert_equal(internal_class.get_the_answer(), 42)
+		assert_equal(internal_class.get_class(), "ExampleInternal")
+
+	if godot_runtime_version["minor"] >= 4:
+		# Test a class with a unicode name.
+		var przykład = ClassDB.instantiate("ExamplePrzykład")
+		assert_equal(przykład.get_the_word(), "słowo to przykład")
 
 	exit_with_status()
 

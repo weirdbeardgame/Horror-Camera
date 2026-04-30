@@ -28,16 +28,15 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#ifndef GODOT_BINDER_COMMON_HPP
-#define GODOT_BINDER_COMMON_HPP
+#pragma once
 
 #include <gdextension_interface.h>
 
+#include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/core/method_ptrcall.hpp>
 #include <godot_cpp/core/type_info.hpp>
 
 #include <array>
-#include <vector>
 
 namespace godot {
 
@@ -148,7 +147,7 @@ template <typename T>
 struct VariantCasterAndValidate {
 	static _FORCE_INLINE_ T cast(const Variant **p_args, uint32_t p_arg_idx, GDExtensionCallError &r_error) {
 		GDExtensionVariantType argtype = GDExtensionVariantType(GetTypeInfo<T>::VARIANT_TYPE);
-		if (!internal::gdextension_interface_variant_can_convert_strict(static_cast<GDExtensionVariantType>(p_args[p_arg_idx]->get_type()), argtype) ||
+		if (!::godot::gdextension_interface::variant_can_convert_strict(static_cast<GDExtensionVariantType>(p_args[p_arg_idx]->get_type()), argtype) ||
 				!VariantObjectClassChecker<T>::check(p_args[p_arg_idx])) {
 			r_error.error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
 			r_error.argument = p_arg_idx;
@@ -163,7 +162,7 @@ template <typename T>
 struct VariantCasterAndValidate<T &> {
 	static _FORCE_INLINE_ T cast(const Variant **p_args, uint32_t p_arg_idx, GDExtensionCallError &r_error) {
 		GDExtensionVariantType argtype = GDExtensionVariantType(GetTypeInfo<T>::VARIANT_TYPE);
-		if (!internal::gdextension_interface_variant_can_convert_strict(static_cast<GDExtensionVariantType>(p_args[p_arg_idx]->get_type()), argtype) ||
+		if (!::godot::gdextension_interface::variant_can_convert_strict(static_cast<GDExtensionVariantType>(p_args[p_arg_idx]->get_type()), argtype) ||
 				!VariantObjectClassChecker<T>::check(p_args[p_arg_idx])) {
 			r_error.error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
 			r_error.argument = p_arg_idx;
@@ -178,7 +177,7 @@ template <typename T>
 struct VariantCasterAndValidate<const T &> {
 	static _FORCE_INLINE_ T cast(const Variant **p_args, uint32_t p_arg_idx, GDExtensionCallError &r_error) {
 		GDExtensionVariantType argtype = GDExtensionVariantType(GetTypeInfo<T>::VARIANT_TYPE);
-		if (!internal::gdextension_interface_variant_can_convert_strict(static_cast<GDExtensionVariantType>(p_args[p_arg_idx]->get_type()), argtype) ||
+		if (!::godot::gdextension_interface::variant_can_convert_strict(static_cast<GDExtensionVariantType>(p_args[p_arg_idx]->get_type()), argtype) ||
 				!VariantObjectClassChecker<T>::check(p_args[p_arg_idx])) {
 			r_error.error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
 			r_error.argument = p_arg_idx;
@@ -262,6 +261,7 @@ void call_with_variant_args_ret_helper(T *p_instance, R (T::*p_method)(P...), co
 #else
 	r_ret = (p_instance->*p_method)(VariantCaster<P>::cast(*p_args[Is])...);
 #endif
+	(void)p_args; // Avoid warning.
 }
 
 template <typename T, typename R, typename... P, size_t... Is>
@@ -273,7 +273,7 @@ void call_with_variant_args_retc_helper(T *p_instance, R (T::*p_method)(P...) co
 #else
 	r_ret = (p_instance->*p_method)(VariantCaster<P>::cast(*p_args[Is])...);
 #endif
-	(void)p_args;
+	(void)p_args; // Avoid warning.
 }
 
 template <typename T, typename... P>
@@ -331,7 +331,7 @@ void call_with_variant_args_retc(T *p_instance, R (T::*p_method)(P...) const, co
 }
 
 template <typename T, typename... P>
-void call_with_variant_args_dv(T *p_instance, void (T::*p_method)(P...), const GDExtensionConstVariantPtr *p_args, int p_argcount, GDExtensionCallError &r_error, const std::vector<Variant> &default_values) {
+void call_with_variant_args_dv(T *p_instance, void (T::*p_method)(P...), const GDExtensionConstVariantPtr *p_args, int p_argcount, GDExtensionCallError &r_error, const LocalVector<Variant> &default_values) {
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
@@ -366,7 +366,7 @@ void call_with_variant_args_dv(T *p_instance, void (T::*p_method)(P...), const G
 }
 
 template <typename T, typename... P>
-void call_with_variant_argsc_dv(T *p_instance, void (T::*p_method)(P...) const, const GDExtensionConstVariantPtr *p_args, int p_argcount, GDExtensionCallError &r_error, const std::vector<Variant> &default_values) {
+void call_with_variant_argsc_dv(T *p_instance, void (T::*p_method)(P...) const, const GDExtensionConstVariantPtr *p_args, int p_argcount, GDExtensionCallError &r_error, const LocalVector<Variant> &default_values) {
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
@@ -401,7 +401,7 @@ void call_with_variant_argsc_dv(T *p_instance, void (T::*p_method)(P...) const, 
 }
 
 template <typename T, typename R, typename... P>
-void call_with_variant_args_ret_dv(T *p_instance, R (T::*p_method)(P...), const GDExtensionConstVariantPtr *p_args, int p_argcount, Variant &r_ret, GDExtensionCallError &r_error, const std::vector<Variant> &default_values) {
+void call_with_variant_args_ret_dv(T *p_instance, R (T::*p_method)(P...), const GDExtensionConstVariantPtr *p_args, int p_argcount, Variant &r_ret, GDExtensionCallError &r_error, const LocalVector<Variant> &default_values) {
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
@@ -436,7 +436,7 @@ void call_with_variant_args_ret_dv(T *p_instance, R (T::*p_method)(P...), const 
 }
 
 template <typename T, typename R, typename... P>
-void call_with_variant_args_retc_dv(T *p_instance, R (T::*p_method)(P...) const, const GDExtensionConstVariantPtr *p_args, int p_argcount, Variant &r_ret, GDExtensionCallError &r_error, const std::vector<Variant> &default_values) {
+void call_with_variant_args_retc_dv(T *p_instance, R (T::*p_method)(P...) const, const GDExtensionConstVariantPtr *p_args, int p_argcount, Variant &r_ret, GDExtensionCallError &r_error, const LocalVector<Variant> &default_values) {
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
@@ -548,7 +548,7 @@ void call_with_variant_args_static(void (*p_method)(P...), const Variant **p_arg
 }
 
 template <typename... P>
-void call_with_variant_args_static_dv(void (*p_method)(P...), const GDExtensionConstVariantPtr *p_args, int p_argcount, GDExtensionCallError &r_error, const std::vector<Variant> &default_values) {
+void call_with_variant_args_static_dv(void (*p_method)(P...), const GDExtensionConstVariantPtr *p_args, int p_argcount, GDExtensionCallError &r_error, const LocalVector<Variant> &default_values) {
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
@@ -640,7 +640,7 @@ void call_with_variant_args_static_ret(R (*p_method)(P...), const Variant **p_ar
 }
 
 template <typename R, typename... P>
-void call_with_variant_args_static_ret_dv(R (*p_method)(P...), const GDExtensionConstVariantPtr *p_args, int p_argcount, Variant &r_ret, GDExtensionCallError &r_error, const std::vector<Variant> &default_values) {
+void call_with_variant_args_static_ret_dv(R (*p_method)(P...), const GDExtensionConstVariantPtr *p_args, int p_argcount, Variant &r_ret, GDExtensionCallError &r_error, const LocalVector<Variant> &default_values) {
 #ifdef DEBUG_ENABLED
 	if ((size_t)p_argcount > sizeof...(P)) {
 		r_error.error = GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
@@ -692,5 +692,3 @@ void call_with_ptr_args_static_method_ret(R (*p_method)(P...), const GDExtension
 
 #include <godot_cpp/classes/global_constants_binds.hpp>
 #include <godot_cpp/variant/builtin_binds.hpp>
-
-#endif // GODOT_BINDER_COMMON_HPP

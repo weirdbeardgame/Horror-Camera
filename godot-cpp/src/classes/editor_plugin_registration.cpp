@@ -39,20 +39,20 @@ Vector<StringName> EditorPlugins::plugin_classes;
 void EditorPlugins::add_plugin_class(const StringName &p_class_name) {
 	ERR_FAIL_COND_MSG(plugin_classes.find(p_class_name) != -1, vformat("Editor plugin already registered: %s", p_class_name));
 	plugin_classes.push_back(p_class_name);
-	internal::gdextension_interface_editor_add_plugin(p_class_name._native_ptr());
+	::godot::gdextension_interface::editor_add_plugin(p_class_name._native_ptr());
 }
 
 void EditorPlugins::remove_plugin_class(const StringName &p_class_name) {
 	int index = plugin_classes.find(p_class_name);
 	ERR_FAIL_COND_MSG(index == -1, vformat("Editor plugin is not registered: %s", p_class_name));
 	plugin_classes.remove_at(index);
-	internal::gdextension_interface_editor_remove_plugin(p_class_name._native_ptr());
+	::godot::gdextension_interface::editor_remove_plugin(p_class_name._native_ptr());
 }
 
 void EditorPlugins::deinitialize(GDExtensionInitializationLevel p_level) {
 	if (p_level == GDEXTENSION_INITIALIZATION_EDITOR) {
 		for (const StringName &class_name : plugin_classes) {
-			internal::gdextension_interface_editor_remove_plugin(class_name._native_ptr());
+			::godot::gdextension_interface::editor_remove_plugin(class_name._native_ptr());
 		}
 		plugin_classes.clear();
 	}

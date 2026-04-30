@@ -28,8 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#ifndef GODOT_BUILTIN_PTRCALL_HPP
-#define GODOT_BUILTIN_PTRCALL_HPP
+#pragma once
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/object.hpp>
@@ -48,7 +47,7 @@ O *_call_builtin_method_ptr_ret_obj(const GDExtensionPtrBuiltInMethod method, GD
 	if (ret == nullptr) {
 		return nullptr;
 	}
-	return reinterpret_cast<O *>(internal::get_object_instance_binding(ret));
+	return reinterpret_cast<O *>(::godot::internal::get_object_instance_binding(ret));
 }
 
 template <typename... Args>
@@ -88,5 +87,3 @@ T _call_builtin_ptr_getter(const GDExtensionPtrGetter getter, GDExtensionConstTy
 } // namespace internal
 
 } // namespace godot
-
-#endif // GODOT_BUILTIN_PTRCALL_HPP

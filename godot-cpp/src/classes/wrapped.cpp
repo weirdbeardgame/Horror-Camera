@@ -60,13 +60,20 @@ void Wrapped::_postinitialize() {
 	Wrapped::_constructing_mutex.unlock();
 #endif
 
+#if GODOT_VERSION_MINOR >= 4
 	Object *obj = dynamic_cast<Object *>(this);
 	if (obj) {
 		obj->notification(Object::NOTIFICATION_POSTINITIALIZE);
 	}
+#else
+	// Only send NOTIFICATION_POSTINITIALIZE for extension classes.
+	if (_is_extension_class()) {
+		_notificationv(Object::NOTIFICATION_POSTINITIALIZE);
+	}
+#endif // GODOT_VERSION_MINOR >= 4
 }
 
-Wrapped::Wrapped(const StringName p_godot_class) {
+Wrapped::Wrapped(const StringName &p_godot_class) {
 #ifdef HOT_RELOAD_ENABLED
 	if (unlikely(Wrapped::_constructing_recreate_owner)) {
 		_owner = Wrapped::_constructing_recreate_owner;
@@ -74,16 +81,22 @@ Wrapped::Wrapped(const StringName p_godot_class) {
 	} else
 #endif
 	{
-		_owner = godot::internal::gdextension_interface_classdb_construct_object2(reinterpret_cast<GDExtensionConstStringNamePtr>(p_godot_class._native_ptr()));
+#if GODOT_VERSION_MINOR >= 7
+		_owner = ::godot::gdextension_interface::classdb_construct_object3(reinterpret_cast<GDExtensionConstStringNamePtr>(p_godot_class._native_ptr()));
+#elif GODOT_VERSION_MINOR >= 4
+		_owner = ::godot::gdextension_interface::classdb_construct_object2(reinterpret_cast<GDExtensionConstStringNamePtr>(p_godot_class._native_ptr()));
+#else
+		_owner = ::godot::gdextension_interface::classdb_construct_object(reinterpret_cast<GDExtensionConstStringNamePtr>(p_godot_class._native_ptr()));
+#endif
 	}
 
 	if (_constructing_extension_class_name) {
-		godot::internal::gdextension_interface_object_set_instance(_owner, reinterpret_cast<GDExtensionConstStringNamePtr>(_constructing_extension_class_name), this);
+		::godot::gdextension_interface::object_set_instance(_owner, reinterpret_cast<GDExtensionConstStringNamePtr>(_constructing_extension_class_name), this);
 		_constructing_extension_class_name = nullptr;
 	}
 
 	if (likely(_constructing_class_binding_callbacks)) {
-		godot::internal::gdextension_interface_object_set_instance_binding(_owner, godot::internal::token, this, _constructing_class_binding_callbacks);
+		::godot::gdextension_interface::object_set_instance_binding(_owner, ::godot::gdextension_interface::token, this, _constructing_class_binding_callbacks);
 		_constructing_class_binding_callbacks = nullptr;
 	} else {
 		CRASH_NOW_MSG("BUG: Godot Object created without binding callbacks. Did you forget to use memnew()?");
@@ -105,16 +118,21 @@ std::vector<EngineClassRegistrationCallback> &get_engine_class_registration_call
 	return engine_class_registration_callbacks;
 }
 
-GDExtensionPropertyInfo *create_c_property_list(const ::godot::List<::godot::PropertyInfo> &plist_cpp, uint32_t *r_size) {
-	GDExtensionPropertyInfo *plist = nullptr;
+GDExtensionPropertyInfo *create_c_property_list(::godot::List<::godot::PropertyInfo> *plist_cpp, uint32_t *r_size) {
 	// Linked list size can be expensive to get so we cache it
-	const uint32_t plist_size = plist_cpp.size();
+	const uint32_t plist_size = plist_cpp->size();
 	if (r_size != nullptr) {
 		*r_size = plist_size;
 	}
-	plist = reinterpret_cast<GDExtensionPropertyInfo *>(memalloc(sizeof(GDExtensionPropertyInfo) * plist_size));
+
+	// Use the padding to stash the plist_cpp pointer, so we can clean it up later.
+	void *mem = ::godot::Memory::alloc_static(sizeof(GDExtensionPropertyInfo) * plist_size, true);
+	GDExtensionPropertyInfo *plist = reinterpret_cast<GDExtensionPropertyInfo *>(mem);
+	::godot::List<::godot::PropertyInfo> **plist_cpp_stash = reinterpret_cast<::godot::List<::godot::PropertyInfo> **>((uint8_t *)mem - ::godot::Memory::DATA_OFFSET + ::godot::Memory::ELEMENT_OFFSET);
+	*plist_cpp_stash = plist_cpp;
+
 	unsigned int i = 0;
-	for (const ::godot::PropertyInfo &E : plist_cpp) {
+	for (const ::godot::PropertyInfo &E : *plist_cpp) {
 		plist[i].type = static_cast<GDExtensionVariantType>(E.type);
 		plist[i].name = E.name._native_ptr();
 		plist[i].hint = E.hint;
@@ -127,7 +145,10 @@ GDExtensionPropertyInfo *create_c_property_list(const ::godot::List<::godot::Pro
 }
 
 void free_c_property_list(GDExtensionPropertyInfo *plist) {
-	memfree(plist);
+	// Get the stashed plist_cpp pointer, before we free the memory that's holding it.
+	::godot::List<::godot::PropertyInfo> *plist_cpp = *reinterpret_cast<::godot::List<::godot::PropertyInfo> **>((uint8_t *)plist - ::godot::Memory::DATA_OFFSET + ::godot::Memory::ELEMENT_OFFSET);
+	::godot::Memory::free_static(plist, true);
+	memdelete(plist_cpp);
 }
 
 void add_engine_class_registration_callback(EngineClassRegistrationCallback p_callback) {
