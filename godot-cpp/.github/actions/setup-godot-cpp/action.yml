@@ -6,7 +6,7 @@ inputs:
     required: true
     description: Target platform.
   em-version:
-    default: 3.1.62
+    default: 4.0.11
     description: Emscripten version.
   windows-compiler:
     required: true
@@ -20,11 +20,15 @@ inputs:
     default: 12.2.0
     description: MinGW version.
   ndk-version:
-    default: r23c
+    default: r28b
     description: Android NDK version.
+  buildtool:
+    default: scons
+    description: scons or cmake
   scons-version:
     default: 4.4.0
     description: SCons version.
+
 
 runs:
   using: composite
@@ -55,8 +59,13 @@ runs:
         version: ${{ inputs.mingw-version }}
 
     - name: Setup SCons
+      if: ${{ inputs.buildtool == 'scons' }}
       shell: bash
       run: |
         python -c "import sys; print(sys.version)"
         python -m pip install scons==${{ inputs.scons-version }}
         scons --version
+
+    - name: Install Ninja
+      if: ${{ inputs.buildtool == 'cmake' }}
+      uses: ashutoshvarma/setup-ninja@master

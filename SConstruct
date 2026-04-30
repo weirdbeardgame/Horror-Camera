@@ -5,7 +5,7 @@ import sys
 from methods import print_error
 
 
-libname = "HorrorCamera"
+libname = "SgCamera"
 projectdir = "project"
 
 localEnv = Environment(tools=["default"], PLATFORM="")

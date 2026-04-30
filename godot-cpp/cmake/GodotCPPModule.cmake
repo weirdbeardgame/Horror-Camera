@@ -86,9 +86,10 @@ missing. ]]
 function(
     binding_generator_generate_bindings
     API_FILE
-    USE_TEMPLATE_GET_NODE,
-    BITS,
-    PRECISION,
+    INTERFACE_FILE
+    USE_TEMPLATE_GET_NODE
+    BITS
+    PRECISION
     OUTPUT_DIR
 )
     # This code snippet will be squashed into a single line
@@ -96,6 +97,7 @@ function(
         "from binding_generator import generate_bindings"
         "generate_bindings(
     api_filepath='${API_FILE}',
+    interface_filepath='${INTERFACE_FILE}',
     use_template_get_node='${USE_TEMPLATE_GET_NODE}',
     bits='${BITS}',
     precision='${PRECISION}',
@@ -166,7 +168,7 @@ function(target_doc_sources TARGET SOURCES)
 
     # Create the file generation target, this won't be triggered unless a target
     # that depends on DOC_SOURCE_FILE is built
-    generate_doc_source( "${DOC_SOURCE_FILE}" ${SOURCES} )
+    generate_doc_source( "${DOC_SOURCE_FILE}" "${SOURCES}" )
 
     # Add DOC_SOURCE_FILE as a dependency to TARGET
     target_sources(${TARGET} PRIVATE "${DOC_SOURCE_FILE}")

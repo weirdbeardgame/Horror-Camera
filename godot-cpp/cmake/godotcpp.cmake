@@ -29,7 +29,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows.cmake)
 # Detect number of processors
 include(ProcessorCount)
 ProcessorCount(PROC_MAX)
-message("Auto-detected ${PROC_MAX} CPU cores available for build parallelism.")
+message(STATUS "Auto-detected ${PROC_MAX} CPU cores available for build parallelism.")
 
 # List of known platforms
 set(PLATFORM_LIST
@@ -114,6 +114,12 @@ function(godotcpp_options)
     set_property(CACHE GODOTCPP_TARGET PROPERTY STRINGS "template_debug;template_release;editor")
 
     # Input from user for GDExtension interface header and the API JSON file
+    set(GODOTCPP_API_VERSION
+        ""
+        CACHE STRING
+        "The Godot API version to target (ex \"4.5\") using one of the included API JSON files"
+    )
+    set_property(CACHE GODOTCPP_API_VERSION PROPERTY STRINGS ";4.3;4.4;4.5;4.6")
     set(GODOTCPP_GDEXTENSION_DIR
         "gdextension"
         CACHE PATH
@@ -122,7 +128,7 @@ function(godotcpp_options)
     set(GODOTCPP_CUSTOM_API_FILE
         ""
         CACHE FILEPATH
-        "Path to a custom GDExtension API JSON file (takes precedence over `GODOTCPP_GDEXTENSION_DIR`) ( /path/to/custom_api_file )"
+        "Path to a custom GDExtension API JSON file (takes precedence over `GODOTCPP_GDEXTENSION_DIR` and `GODOTCPP_API_VERSION`) ( /path/to/custom_api_file )"
     )
 
     #TODO generate_bindings
@@ -155,6 +161,7 @@ function(godotcpp_options)
 
     #TODO optimize
 
+    option(GODOTCPP_DEPRECATED "Enable compatibility code for deprecated and removed features" ON)
     option(GODOTCPP_DEV_BUILD "Developer build with dev-only debugging code (DEV_ENABLED)" OFF)
 
     #[[ debug_symbols
@@ -197,15 +204,21 @@ function(godotcpp_generate)
     another compiler simulating the Visual C++ cl command-line syntax. ]]
     if(MSVC)
         math(EXPR PROC_N "(${PROC_MAX}-1) | (${X}-2)>>31 & 1")
-        message("Using ${PROC_N} cores for multi-threaded compilation.")
+        message(STATUS "Using ${PROC_N} cores for multi-threaded compilation.")
         # TODO You can override it at configure time with ...." )
     else()
+        if(CMAKE_BUILD_PARALLEL_LEVEL)
+            set(_cores "${CMAKE_BUILD_PARALLEL_LEVEL}")
+        else()
+            set(_cores "all")
+        endif()
         message(
-            "Using ${CMAKE_BUILD_PARALLEL_LEVEL} cores, You can override"
-            " it at configure time by using -j <n> or --parallel <n> on the build"
+            STATUS
+            "Using ${_cores} cores. You can override"
+            " this at configure time by using -j <n> or --parallel <n> in the build"
             " command."
         )
-        message("  eg. cmake --build . -j 7  ...")
+        message(STATUS "  eg. cmake --build . -j 7  ...")
     endif()
 
     #[[ GODOTCPP_SYMBOL_VISIBLITY
@@ -237,16 +250,27 @@ function(godotcpp_generate)
     math(EXPR BITS "${CMAKE_SIZEOF_VOID_P} * 8") # CMAKE_SIZEOF_VOID_P refers to target architecture.
 
     # API json File
-    set(GODOTCPP_GDEXTENSION_API_FILE "${GODOTCPP_GDEXTENSION_DIR}/extension_api.json")
+    set(GODOTCPP_LATEST_API_VERSION "4.6")
+    if(GODOTCPP_API_VERSION STREQUAL "" OR GODOTCPP_API_VERSION STREQUAL GODOTCPP_LATEST_API_VERSION)
+        set(GODOTCPP_GDEXTENSION_API_FILE "${GODOTCPP_GDEXTENSION_DIR}/extension_api.json")
+    else()
+        string(REPLACE "." "-" GODOTCPP_API_VERSION_DASHED "${GODOTCPP_API_VERSION}")
+        set(GODOTCPP_GDEXTENSION_API_FILE
+            "${GODOTCPP_GDEXTENSION_DIR}/extension_api-${GODOTCPP_API_VERSION_DASHED}.json"
+        )
+    endif()
     if(GODOTCPP_CUSTOM_API_FILE) # User-defined override.
         set(GODOTCPP_GDEXTENSION_API_FILE "${GODOTCPP_CUSTOM_API_FILE}")
     endif()
 
+    # Interface json file.
+    set(GODOTCPP_GDEXTENSION_INTERFACE_FILE "${GODOTCPP_GDEXTENSION_DIR}/gdextension_interface.json")
+
     # Build Profile
     if(GODOTCPP_BUILD_PROFILE)
         message(STATUS "Using build profile to trim api file")
-        message("\tBUILD_PROFILE = '${GODOTCPP_BUILD_PROFILE}'")
-        message("\tAPI_SOURCE = '${GODOTCPP_GDEXTENSION_API_FILE}'")
+        message(STATUS "\tBUILD_PROFILE = '${GODOTCPP_BUILD_PROFILE}'")
+        message(STATUS "\tAPI_SOURCE = '${GODOTCPP_GDEXTENSION_API_FILE}'")
         build_profile_generate_trimmed_api(
                 "${GODOTCPP_BUILD_PROFILE}"
                 "${GODOTCPP_GDEXTENSION_API_FILE}"
@@ -256,6 +280,7 @@ function(godotcpp_generate)
     endif()
 
     message(STATUS "GODOTCPP_GDEXTENSION_API_FILE = '${GODOTCPP_GDEXTENSION_API_FILE}'")
+    message(STATUS "GODOTCPP_GDEXTENSION_INTERFACE_FILE = '${GODOTCPP_GDEXTENSION_INTERFACE_FILE}'")
 
     # generate the file list to use
     binding_generator_get_file_list( GENERATED_FILES_LIST
@@ -265,6 +290,7 @@ function(godotcpp_generate)
 
     binding_generator_generate_bindings(
             "${GODOTCPP_GDEXTENSION_API_FILE}"
+            "${GODOTCPP_GDEXTENSION_INTERFACE_FILE}"
             "${USE_TEMPLATE_GET_NODE}"
             "${BITS}"
             "${GODOTCPP_PRECISION}"
@@ -276,7 +302,7 @@ function(godotcpp_generate)
     string(
         CONCAT
         SYSTEM_NAME
-        "$<$<PLATFORM_ID:Android>:android.${ANDROID_ABI}>"
+        "$<$<PLATFORM_ID:Android>:android>"
         "$<$<PLATFORM_ID:iOS>:ios>"
         "$<$<PLATFORM_ID:Linux>:linux>"
         "$<$<PLATFORM_ID:Darwin>:macos>"
@@ -313,11 +339,11 @@ function(godotcpp_generate)
     set(DEBUG_FEATURES "$<NOT:$<STREQUAL:${GODOTCPP_TARGET},template_release>>")
     set(HOT_RELOAD "$<IF:${HOT_RELOAD-UNSET},${DEBUG_FEATURES},$<BOOL:${GODOTCPP_USE_HOT_RELOAD}>>")
 
-    # Suffix
+    # Suffix Generator Expression
     string(
         CONCAT
-        GODOTCPP_SUFFIX
-        "$<1:.${SYSTEM_NAME}>"
+        GODOTCPP_SUFFIX_GENEX
+        "$<1:${SYSTEM_NAME}>"
         "$<1:.${GODOTCPP_TARGET}>"
         "$<${IS_DEV_BUILD}:.dev>"
         "$<$<STREQUAL:${GODOTCPP_PRECISION},double>:.double>"
@@ -325,6 +351,8 @@ function(godotcpp_generate)
         # TODO IOS_SIMULATOR
         "$<$<NOT:${THREADS_ENABLED}>:.nothreads>"
     )
+    # The same as above, but with a leading '.' to maintain backwards compatibility.
+    set(GODOTCPP_SUFFIX ".${GODOTCPP_SUFFIX_GENEX}")
 
     # the godot-cpp.* library targets
     add_library(godot-cpp STATIC)
@@ -343,7 +371,9 @@ function(godotcpp_generate)
     target_include_directories(
         godot-cpp
         ${GODOTCPP_SYSTEM_HEADERS_ATTRIBUTE}
-        PUBLIC include ${CMAKE_CURRENT_BINARY_DIR}/gen/include ${GODOTCPP_GDEXTENSION_DIR}
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/gen/include>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     )
 
     # gersemi: off
@@ -364,11 +394,12 @@ function(godotcpp_generate)
             ARCHIVE_OUTPUT_DIRECTORY "$<1:${CMAKE_BINARY_DIR}/bin>"
 
             # Things that are handy to know for dependent targets
-            GODOTCPP_PLATFORM  "${SYSTEM_NAME}"
-            GODOTCPP_TARGET    "${GODOTCPP_TARGET}"
-            GODOTCPP_ARCH      "${ARCH_NAME}"
-            GODOTCPP_PRECISION "${GODOTCPP_PRECISION}"
-            GODOTCPP_SUFFIX    "${GODOTCPP_SUFFIX}"
+            GODOTCPP_PLATFORM       "${SYSTEM_NAME}"
+            GODOTCPP_TARGET         "${GODOTCPP_TARGET}"
+            GODOTCPP_ARCH           "${ARCH_NAME}"
+            GODOTCPP_PRECISION      "${GODOTCPP_PRECISION}"
+            GODOTCPP_SUFFIX         "${GODOTCPP_SUFFIX}"
+            GODOTCPP_SUFFIX_GENEX   "${GODOTCPP_SUFFIX_GENEX}"
 
             # Some IDE's respect this property to logically group targets
             FOLDER "godot-cpp"

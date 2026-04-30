@@ -3,8 +3,7 @@
  * This is free and unencumbered software released into the public domain.
  */
 
-#ifndef EXAMPLE_CLASS_H
-#define EXAMPLE_CLASS_H
+#pragma once
 
 // We don't need windows.h in this example plugin but many others do, and it can
 // lead to annoying situations due to the ton of macros it defines.
@@ -20,15 +19,21 @@
 #include <godot_cpp/classes/input_event_key.hpp>
 #include <godot_cpp/classes/tile_map.hpp>
 #include <godot_cpp/classes/tile_set.hpp>
+#include <godot_cpp/classes/tween.hpp>
 #include <godot_cpp/classes/viewport.hpp>
-#include <godot_cpp/variant/typed_dictionary.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/variant_internal.hpp>
+
+#if GODOT_VERSION_MINOR >= 4
+#include <godot_cpp/variant/typed_dictionary.hpp>
+#endif // GODOT_VERSION_MINOR >= 4
 
 #include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/gdvirtual.gen.inc>
 
 using namespace godot;
+
+class ExampleInternal;
 
 class ExampleRef : public RefCounted {
 	GDCLASS(ExampleRef, RefCounted);
@@ -59,7 +64,7 @@ class ExampleMin : public Control {
 	GDCLASS(ExampleMin, Control);
 
 protected:
-	static void _bind_methods(){};
+	static void _bind_methods() {}
 };
 
 class Example : public Control {
@@ -106,6 +111,8 @@ public:
 	Example();
 	~Example();
 
+	Dictionary get_godot_target_version() const;
+
 	// Functions.
 	void simple_func();
 	void simple_const_func() const;
@@ -117,7 +124,7 @@ public:
 	Viewport *return_something_const() const;
 	Ref<ExampleRef> return_ref() const;
 	Ref<ExampleRef> return_empty_ref() const;
-	ExampleRef *return_extended_ref() const;
+	Ref<ExampleRef> return_extended_ref() const;
 	Ref<ExampleRef> extended_ref_checks(Ref<ExampleRef> p_ref) const;
 	Variant varargs_func(const Variant **args, GDExtensionInt arg_count, GDExtensionCallError &error);
 	int varargs_func_nv(const Variant **args, GDExtensionInt arg_count, GDExtensionCallError &error);
@@ -131,8 +138,12 @@ public:
 	int test_tarray_arg(const TypedArray<int64_t> &p_array);
 	TypedArray<Vector2> test_tarray() const;
 	Dictionary test_dictionary() const;
+
+#if GODOT_VERSION_MINOR >= 4
 	int test_tdictionary_arg(const TypedDictionary<String, int64_t> &p_dictionary);
 	TypedDictionary<Vector2, Vector2i> test_tdictionary() const;
+#endif // GODOT_VERSION_MINOR >= 4
+
 	Example *test_node_argument(Example *p_node) const;
 	String test_string_ops() const;
 	String test_str_utility() const;
@@ -153,6 +164,7 @@ public:
 
 	void test_add_child(Node *p_node);
 	void test_set_tileset(TileMap *p_tilemap, const Ref<TileSet> &p_tileset) const;
+	bool test_tween_smoke_test();
 
 	Variant test_variant_call(Variant p_variant);
 
@@ -204,6 +216,8 @@ public:
 	String test_use_engine_singleton() const;
 
 	static String test_library_path();
+
+	Ref<RefCounted> test_get_internal_class() const;
 };
 
 VARIANT_ENUM_CAST(Example::Constants);
@@ -290,4 +304,12 @@ public:
 	String get_the_word() const;
 };
 
-#endif // EXAMPLE_CLASS_H
+class ExampleInternal : public RefCounted {
+	GDCLASS(ExampleInternal, RefCounted);
+
+protected:
+	static void _bind_methods();
+
+public:
+	int get_the_answer() const;
+};

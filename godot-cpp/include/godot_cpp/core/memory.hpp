@@ -28,8 +28,7 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#ifndef GODOT_MEMORY_HPP
-#define GODOT_MEMORY_HPP
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -85,12 +84,22 @@ public:
 template <typename T, std::enable_if_t<!std::is_base_of<::godot::Wrapped, T>::value, bool> = true>
 _ALWAYS_INLINE_ void _pre_initialize() {}
 
+template <typename T, typename Enable = void>
+struct memnew_result {
+	using class_name = T *;
+	_ALWAYS_INLINE_ static class_name capture(T *p_obj) { return p_obj; }
+};
+
+template <typename T>
+using memnew_result_t = typename memnew_result<T>::class_name;
+
 _ALWAYS_INLINE_ void postinitialize_handler(void *) {}
 
 template <typename T>
-_ALWAYS_INLINE_ T *_post_initialize(T *p_obj) {
+_ALWAYS_INLINE_ memnew_result_t<T> _post_initialize(T *p_obj) {
+	memnew_result_t<T> result(memnew_result<T>::capture(p_obj));
 	postinitialize_handler(p_obj);
-	return p_obj;
+	return result;
 }
 
 #define memalloc(m_size) ::godot::Memory::alloc_static(m_size)
@@ -101,12 +110,6 @@ _ALWAYS_INLINE_ T *_post_initialize(T *p_obj) {
 
 #define memnew_allocator(m_class, m_allocator) (::godot::_pre_initialize<std::remove_pointer_t<decltype(new ("", "") m_class)>>(), ::godot::_post_initialize(new ("", m_allocator::alloc) m_class))
 #define memnew_placement(m_placement, m_class) (::godot::_pre_initialize<std::remove_pointer_t<decltype(new ("", "") m_class)>>(), ::godot::_post_initialize(new ("", m_placement, sizeof(m_class), "") m_class))
-
-// Generic comparator used in Map, List, etc.
-template <typename T>
-struct Comparator {
-	_ALWAYS_INLINE_ bool operator()(const T &p_a, const T &p_b) const { return (p_a < p_b); }
-};
 
 template <typename T>
 void memdelete(T *p_class, typename std::enable_if<!std::is_base_of_v<godot::Wrapped, T>>::type * = nullptr) {
@@ -119,7 +122,7 @@ void memdelete(T *p_class, typename std::enable_if<!std::is_base_of_v<godot::Wra
 
 template <typename T, std::enable_if_t<std::is_base_of_v<godot::Wrapped, T>, bool> = true>
 void memdelete(T *p_class) {
-	godot::internal::gdextension_interface_object_destroy(p_class->_owner);
+	::godot::gdextension_interface::object_destroy(p_class->_owner);
 }
 
 template <typename T, typename A>
@@ -216,5 +219,3 @@ struct _GlobalNilClass {
 };
 
 } // namespace godot
-
-#endif // GODOT_MEMORY_HPP
