@@ -17,6 +17,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/vector3.hpp>
 
 #define CAMERA_NO (tbl)((tbl >> 8) & 0x1ff)
 #define CAMERA_ACTIVE (tbl)(tbl & 0xff)
@@ -47,8 +48,8 @@ struct CAM_ID_MOVE {
 };
 
 struct SgCameraData {
-	Vector3 p;
-	Vector3 i;
+	Vector3 position;
+	Vector3 interest;
 	float roll;
 	real_t fov;
 	real_t nearz;
@@ -103,11 +104,7 @@ private:
 
 	int cd_edit_end;
 
-	RID camera_rid;
-	RID scenario_id;
-
-	Ref<Compositor> compositor;
-	Ref<Environment> environment;
+	RID camera_rid; /// The actual camera
 	Ref<CameraAttributes> attributes;
 
 	friend class Viewport;
@@ -131,7 +128,6 @@ public:
 	SgCamera();
 
 	void _ready() override;
-	void _process(double delta) override;
 	void print_type(const Variant &p_variant) const;
 
 	void make_current();
@@ -140,7 +136,6 @@ public:
 	bool is_current() const;
 	RID get_camera() const;
 	void set_perspective(real_t p_fovy_degrees, real_t p_z_near, real_t p_z_far);
-	void _on_body_entered(Node3D *body);
 
 	void CameraMain();
 	void KonwakuCamCtrl();
@@ -156,6 +151,9 @@ public:
 	int GetEasingMode() { return camera_easing_mode; }
 	bool GetFocusEnabled() { return camera_focus_enabled; }
 	int GetFocusData() { return camera_focus_data; }
+
+	Vector3 GetPosition() { return camera.position; }
+	Vector3 GetInterest() { return camera.interest; }
 
 	SgCameraData GetCameraData() { return camera; }
 

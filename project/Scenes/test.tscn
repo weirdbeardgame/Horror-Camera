@@ -8,7 +8,7 @@
 size = Vector3(1, 1, 0.99121094)
 
 [sub_resource type="MapCamDat" id="MapCamDat_lc1oi"]
-p1 = Vector3i(7, 3, 31)
+p1 = Vector3i(7, 4, 34)
 
 [node name="Sketchfab_Scene" unique_id=764998005 instance=ExtResource("1_lc1oi")]
 
@@ -27,4 +27,4 @@ shape = SubResource("BoxShape3D_8od7v")
 
 [node name="SgCamera" type="SgCamera" parent="." index="3" unique_id=243096084]
 mcd = SubResource("MapCamDat_lc1oi")
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.2494316, 3.9782205, 31.290264)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.6402445, 4.4893837, 34.846966)

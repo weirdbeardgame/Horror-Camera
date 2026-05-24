@@ -62,8 +62,8 @@ int CameraEffects::QuakeCamera() {
 		val[i][3] = 0;
 	}
 
-	camera.GetCameraData().p += val[0];
-	camera.GetCameraData().i += val[1];
+	camera.GetCameraData().position += val[0];
+	camera.GetCameraData().interest += val[1];
 }
 
 void CameraEffects::StopQuake() {
