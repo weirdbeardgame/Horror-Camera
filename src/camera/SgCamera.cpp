@@ -85,7 +85,7 @@ SgCamera::SgCamera() {
 	statusControl->add_child(pointStatus);
 	pointStatus->set_offset(SIDE_RIGHT, -200);
 
-	set_perspective(51.0f, 0.05, 4000.0);
+	set_perspective(44.0f, 0.1f, 32768.0f);
 	RenderingServer::get_singleton()->camera_set_cull_mask(camera_rid, layers);
 
 	if (mcd.is_valid()) {
@@ -240,7 +240,6 @@ void SgCamera::ClearDramaCamReq() {
 	}
 }
 
-// ToDo, replace MCI with active camera in scene
 void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO *mci) {
 	Vector3 tc0;
 	Vector3 tc1;
@@ -283,45 +282,46 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 
 		compling = mci->no;
 
-		comple_div = tbl[i] & 0xff;
-		comple_cnt = comple_div;
-		comple_spd_dwn = tbl[i] >> 30;
+		if (blend_frames) {
+			comple_div = blend_frames; // Blend Frames
+			comple_cnt = comple_div;
+			comple_spd_dwn = camera_easing_mode;
 
-		if (comple_spd_dwn != 0) {
-			comple_dwn_tm = comple_cnt / 2;
+			if (comple_spd_dwn != 0) {
+				comple_dwn_tm = comple_cnt / 2;
+			}
+
+			comple_adjr = tc->interest + camera.interest;
+			comple_adjr /= comple_div;
+
+			rmax = (fabsf(comple_adjr[0]) > fabsf(comple_adjr[1]))
+					? 0
+					: 1;
+			rmax = (fabsf(comple_adjr[rmax]) > fabsf(comple_adjr[2]))
+					? rmax
+					: 2;
+
+			comple_adjp = tc->position + camera.position;
+			comple_adjp /= comple_div;
+
+			pmax = (fabsf(comple_adjr[0]) > fabsf(comple_adjr[1]))
+					? 0
+					: 1;
+			pmax = (fabsf(comple_adjr[pmax]) > fabsf(comple_adjr[2]))
+					? pmax
+					: 2;
+
+			comple_adjfov = (tc->fov - camera.fov);
+			comple_adjfov /= comple_div;
+
+			comple_adjroll = tc->roll - camera.roll;
+
+			RotLimitChk(&comple_adjroll);
+
+			comple_adjroll = comple_adjroll / comple_div;
 		}
-
-		comple_adjr = tc->interest + camera.interest;
-		comple_adjr /= comple_div;
-
-		rmax = (fabsf(comple_adjr[0]) > fabsf(comple_adjr[1]))
-				? 0
-				: 1;
-		rmax = (fabsf(comple_adjr[rmax]) > fabsf(comple_adjr[2]))
-				? rmax
-				: 2;
-
-		comple_adjp = tc->position + camera.position;
-		comple_adjp /= comple_div;
-
-		pmax = (fabsf(comple_adjr[0]) > fabsf(comple_adjr[1]))
-				? 0
-				: 1;
-		pmax = (fabsf(comple_adjr[pmax]) > fabsf(comple_adjr[2]))
-				? pmax
-				: 2;
-
-		comple_adjfov = (tc->fov - camera.fov);
-		comple_adjfov /= comple_div;
-
-		comple_adjroll = tc->roll - camera.roll;
-
-		RotLimitChk(&comple_adjroll);
-
-		comple_adjroll = comple_adjroll / comple_div;
-
 	} else {
-		if (mci->type > 1) {
+		if (mci->type == 2 || mci->type == 3 || mci->type == 4) {
 			if (comple_spd_dwn) {
 				comple_adjp = tc->position - oc->position;
 			}
@@ -343,7 +343,7 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 			comple_adjr = tc->interest / oc->interest;
 		}
 		if (mci->type == 0x4) {
-			if (comple_spd_dwn) {
+			if (comple_spd_dwn == 3) {
 				comple_adjr = tc->interest - oc->interest;
 			} else {
 				tc0 = Vector3();
@@ -495,51 +495,46 @@ void SgCamera::NormalCameraCtrl() {
 	int debug = false;
 	int cd_edit_end;
 
-	godot::UtilityFunctions::print("Before Set Pos");
 	DramaCameraReqCtrl();
 
 	if (mci.change != 0) {
 		//plyr_wrk->cp_old = camera.position;
 	}
 
-	if (!Engine::get_singleton()->is_editor_hint()) {
-		// Type of angles?
-		switch (mci.type) {
-			case 0:
-				SetCamPos0(&tc);
-				break;
-			case 1:
-				SetCamPos1(&tc);
-				break;
-			case 2:
-				SetCamPos2(&tc, &mci);
-				break;
-			case 3:
-				SetCamPos3(&tc, &mci);
-				break;
-			case 4:
-				SetCamPos4(&tc, &mci);
-				break;
-			case 5:
-				SetCamPos5(&tc, &mci);
-				break;
-
-				tc2 = tc;
-
-				CompleCameraPos(&tc, &oc, &mci);
-
-				if (plyr_wrk)
-					plyr_wrk->prot = GetTrgtRotY(camera.position, plyr_wrk->get_global_position());
-
-				godot::UtilityFunctions::print("Position: ", camera.position);
-				godot::UtilityFunctions::print("Interest: ", camera.interest);
-				oc = tc2;
-		}
-	} else {
-		tc.position = get_global_position();
-		//tc.interest = plyr_wrk->get_global_position();
-		tc.roll = get_global_rotation().y;
+	// Type of angles?
+	switch (mci.type) {
+		case 0:
+			SetCamPos0(&tc);
+			break;
+		case 1:
+			SetCamPos1(&tc);
+			break;
+		case 2:
+			SetCamPos2(&tc, &mci);
+			break;
+		case 3:
+			SetCamPos3(&tc, &mci);
+			break;
+		case 4:
+			SetCamPos4(&tc, &mci);
+			break;
+		case 5:
+			SetCamPos5(&tc, &mci);
+			break;
 	}
+	tc2 = tc;
+
+	CompleCameraPos(&tc, &oc, &mci);
+
+	if (plyr_wrk)
+		plyr_wrk->prot = GetTrgtRotY(camera.position, plyr_wrk->get_global_position());
+
+	godot::UtilityFunctions::print("Position: ", camera.position);
+	godot::UtilityFunctions::print("Interest: ", camera.interest);
+	oc = tc2;
+
+	tc.position = get_global_position();
+	tc.roll = get_global_rotation().y;
 
 	camera.interest = tc.interest;
 	camera.roll = tc.roll;

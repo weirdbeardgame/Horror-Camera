@@ -14,7 +14,7 @@ public:
 	u_int mvsta;
 	Vector3 cp_old;
 	float prot;
-	Vector4 bwp;
-
+	/// Bounding Waist Position
+	Vector3 bwp;
 	Plyr_Wrk();
 };

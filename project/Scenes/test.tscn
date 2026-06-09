@@ -28,4 +28,4 @@ shape = SubResource("BoxShape3D_8od7v")
 
 [node name="SgCamera" type="SgCamera" parent="." index="3" unique_id=243096084]
 mcd = SubResource("MapCamDat_lc1oi")
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.6402445, 4.4893837, 34.846966)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.6402445, 4.4893837, 35.386955)
