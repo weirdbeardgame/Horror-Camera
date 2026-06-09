@@ -42,34 +42,32 @@ public:
 	int cd_edit_end;
 
 	MapCamDat();
-	void emit_changed();
 
-	void SetCamKind(int k) { cam_kind = k; }
+	void SetCamKind(int k);
 	int GetCamKind() { return cam_kind; }
-
 	int GetType() { return type; }
-	void SetType(int t) { type = t; }
+	void SetType(int t);
 	int GetCamType() { return cam_type; }
-	void SetCamType(int t) { cam_type = t; }
+	void SetCamType(int t);
 
 	int GetID() { return id; }
-	void SetID(int i) { id = i; }
+	void SetID(int i);
 
 	int GetPointID() { return pointID; }
-	void SetPointID(int i) { pointID = i; }
+	void SetPointID(int i);
 
 	Vector3i GetP0() { return p0; }
-	void SetP0(Vector3i point) { p0 = point; }
+	void SetP0(Vector3i point);
 	Vector3i GetP1() { return p1; }
-	void SetP1(Vector3i point) { p1 = point; }
+	void SetP1(Vector3i point);
 	Vector3i GetP2() { return p2; }
-	void SetP2(Vector3i point) { p2 = point; }
+	void SetP2(Vector3i point);
 	Vector3i GetP3() { return p3; }
-	void SetP3(Vector3i point) { p0 = point; }
+	void SetP3(Vector3i point);
 	Vector2 GetRoll() { return roll; }
-	void SetRoll(Vector2 r) { roll = r; }
+	void SetRoll(Vector2 r);
 	Vector2 GetFOV() { return fov; }
-	void SetFOV(Vector2 f) { fov = f; }
+	void SetFOV(Vector2 f);
 };
 
 VARIANT_ENUM_CAST(CamKind);

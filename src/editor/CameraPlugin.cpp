@@ -52,15 +52,18 @@ SgCameraPreview::SgCameraPreview(SgCamera *p_camera) {
 }
 
 Size2i SgCameraPreview::get_camera_viewport_size(SgCamera *p_camera) {
-	Window *window = Object::cast_to<Window>(sub_viewport);
+	Viewport *viewport = p_camera->get_viewport();
+
+	Window *window = Object::cast_to<Window>(viewport);
 	if (window) {
 		return window->get_size();
 	}
 
+	SubViewport *sub_viewport = Object::cast_to<SubViewport>(viewport);
 	ERR_FAIL_NULL_V(sub_viewport, Size2i());
 
-	if (sub_viewport == EditorInterface::get_singleton()->get_edited_scene_root()) {
-		return Size2(ProjectSettings::get_singleton()->get_setting("display/window/size/viewport_width"), ProjectSettings::get_singleton()->get_setting("display/window/size/viewport_height"));
+	if (sub_viewport == EditorInterface::get_singleton()->get_edited_scene_root()->get_viewport()) {
+		return Size2i(ProjectSettings::get_singleton()->get_setting("display/window/size/viewport_width"), ProjectSettings::get_singleton()->get_setting("display/window/size/viewport_height"));
 	}
 
 	return sub_viewport->get_size();

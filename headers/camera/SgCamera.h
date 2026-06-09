@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <godot_cpp/classes/character_body3d.hpp>
 #include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/ray_cast3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/viewport.hpp>
@@ -18,6 +19,11 @@
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+
+// UI Includes
+#include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/classes/label.hpp>
+#include <godot_cpp/classes/label3d.hpp>
 
 #define CAMERA_NO (tbl)((tbl >> 8) & 0x1ff)
 #define CAMERA_ACTIVE (tbl)(tbl & 0xff)
@@ -104,8 +110,8 @@ private:
 
 	int cd_edit_end;
 
-	RID camera_rid; /// The actual camera
-	Ref<CameraAttributes> attributes;
+	/// The actual camera
+	RID camera_rid;
 
 	friend class Viewport;
 	Viewport *viewport;
@@ -119,7 +125,12 @@ private:
 	Ref<MapCamDat> mcd;
 	SgCameraData camera;
 
+	RayCast3D *interestPoint;
 	Projection projectionMatrix;
+
+	// UI Stuff
+	Control *statusControl;
+	Label *pointStatus;
 
 	void _update_projection();
 	void _attributes_changed();
@@ -128,6 +139,8 @@ public:
 	SgCamera();
 
 	void _ready() override;
+	void _process(double delta) override;
+
 	void print_type(const Variant &p_variant) const;
 
 	void make_current();

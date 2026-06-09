@@ -4,6 +4,10 @@
 #include "camera/MapCamDat.h"
 #include <sys/types.h>
 
+#include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/classes/global_constants.hpp>
+#include <godot_cpp/classes/label.hpp>
+#include <godot_cpp/classes/ray_cast3d.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
@@ -14,6 +18,7 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/viewport.hpp>
+
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/engine_ptrcall.hpp>
 #include <godot_cpp/core/error_macros.hpp>
@@ -23,6 +28,7 @@
 #include <godot_cpp/classes/compositor.hpp>
 #include <godot_cpp/classes/environment.hpp>
 #include <godot_cpp/classes/world3d.hpp>
+#include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
@@ -63,21 +69,34 @@ SgCamera::SgCamera() {
 	camera_focus_data = 0;
 
 	camera = SgCameraData();
-
 	server = RenderingServer::get_singleton();
 	plyr_wrk = Object::cast_to<Plyr_Wrk>(get_parent());
 
 	mcd.instantiate();
-
+	interestPoint = memnew(RayCast3D);
 	camera_rid = server->camera_create();
+
+	statusControl = memnew(Control);
+	pointStatus = memnew(Label);
+
+	add_child(statusControl);
+	statusControl->set_anchors_preset(Control::PRESET_TOP_RIGHT);
+
+	statusControl->add_child(pointStatus);
+	pointStatus->set_offset(SIDE_RIGHT, -200);
 
 	set_perspective(51.0f, 0.05, 4000.0);
 	RenderingServer::get_singleton()->camera_set_cull_mask(camera_rid, layers);
 
-	if (attributes.is_valid()) {
+	if (mcd.is_valid()) {
 		godot::UtilityFunctions::print("Valid attributes");
-		server->camera_set_camera_attributes(camera_rid, attributes->get_rid());
+		server->camera_set_camera_attributes(camera_rid, mcd->get_rid());
 	}
+
+	add_child(interestPoint);
+
+	interestPoint->set_enabled(true);
+	interestPoint->set_target_position(Vector3(0, 0, -100));
 
 	set_notify_transform(true);
 	set_disable_scale(true);
@@ -97,12 +116,11 @@ void SgCamera::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_fov"), &SgCamera::get_fov);
 	ClassDB::bind_method(D_METHOD("set_fov", "fov"), &SgCamera::set_fov);
-
 	ClassDB::bind_method(D_METHOD("get_farz"), &SgCamera::get_farz);
 	ClassDB::bind_method(D_METHOD("set_farz", "farz"), &SgCamera::set_farz);
-
 	ClassDB::bind_method(D_METHOD("set_nearz", "nearz"), &SgCamera::set_nearz);
 	ClassDB::bind_method(D_METHOD("get_nearz"), &SgCamera::get_nearz);
+	ClassDB::bind_method(D_METHOD("set_perspective", "fov", "z_near", "z_far"), &SgCamera::set_perspective);
 
 	ClassDB::bind_method(D_METHOD("GetFocusData"), &SgCamera::GetFocusData);
 	ClassDB::bind_method(D_METHOD("GetEasingMode"), &SgCamera::GetEasingMode);
@@ -516,7 +534,6 @@ void SgCamera::NormalCameraCtrl() {
 				godot::UtilityFunctions::print("Position: ", camera.position);
 				godot::UtilityFunctions::print("Interest: ", camera.interest);
 				oc = tc2;
-				godot::UtilityFunctions::print("After Set Pos");
 		}
 	} else {
 		tc.position = get_global_position();
@@ -574,6 +591,11 @@ Transform3D SgCamera::get_camera_transform() const {
 	return ret;
 }
 
+void SgCamera::_process(double delta) {
+	camera.interest = interestPoint->get_transform().get_origin() - interestPoint->get_global_transform().basis[2] * -100.0;
+	godot::UtilityFunctions::print("Interest: ", camera.interest);
+}
+
 void SgCamera::_update_camera() {
 	CameraMain();
 }
@@ -620,15 +642,11 @@ bool SgCamera::is_current() const {
 }
 
 void SgCamera::set_perspective(real_t p_fovy_degrees, real_t p_z_near, real_t p_z_far) {
-	if (!force_change && camera.fov == p_fovy_degrees && p_z_near == camera.nearz && p_z_far == camera.farz) {
-		return;
-	}
-
 	camera.fov = p_fovy_degrees;
 	camera.nearz = p_z_near;
 	camera.farz = p_z_far;
 
-	RenderingServer::get_singleton()->camera_set_perspective(camera_rid, p_fovy_degrees, p_z_near, p_z_far);
+	RenderingServer::get_singleton()->camera_set_perspective(camera_rid, camera.fov, camera.nearz, camera.farz);
 	update_gizmos();
 	force_change = false;
 }
@@ -1174,6 +1192,7 @@ int SgCamera::SetMapCamDat4(Ref<MapCamDat> mcd, int id) {
 			mcd->roll[0] = camera.roll;
 			mcd->fov[0] = camera.fov;
 
+			pointStatus->set_text("Point 1 Set");
 			mcd->pointID++;
 			break;
 		case 1:
@@ -1197,6 +1216,7 @@ int SgCamera::SetMapCamDat4(Ref<MapCamDat> mcd, int id) {
 				mcd->fov[1] = 0.0f;
 			}
 
+			pointStatus->set_text("Point 2 Set");
 			mcd->pointID++;
 			break;
 		case 2:
@@ -1218,9 +1238,11 @@ int SgCamera::SetMapCamDat4(Ref<MapCamDat> mcd, int id) {
 				mcd->p3 = tmpd->p3;
 			}
 
+			pointStatus->set_text("Saved Points");
 			end = 1;
 			break;
 		default:
+			pointStatus->set_text("");
 			end = 1;
 			break;
 	}

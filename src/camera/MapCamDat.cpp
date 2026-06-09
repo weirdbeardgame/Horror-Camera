@@ -56,11 +56,49 @@ void MapCamDat::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "roll"), "SetRoll", "GetRoll");
 }
 
-void MapCamDat::emit_changed() {
-	String path = get_path();
+void MapCamDat::SetCamKind(int k) {
+	cam_kind = k;
+	emit_changed();
+}
+void MapCamDat::SetType(int t) {
+	type = t;
+	emit_changed();
+}
+void MapCamDat::SetCamType(int t) {
+	cam_type = t;
+	emit_changed();
+}
+void MapCamDat::SetID(int i) {
+	id = i;
+	emit_changed();
+}
 
-	if (!path.is_empty() && path.begins_with("res://")) {
-		ResourceSaver *save = ResourceSaver::get_singleton();
-		save->save(this, path);
-	}
+void MapCamDat::SetPointID(int i) {
+	pointID = i;
+	emit_changed();
+}
+
+void MapCamDat::SetP0(Vector3i point) {
+	p0 = point;
+	emit_changed();
+}
+void MapCamDat::SetP1(Vector3i point) {
+	p1 = point;
+	emit_changed();
+}
+void MapCamDat::SetP2(Vector3i point) {
+	p2 = point;
+	emit_changed();
+}
+void MapCamDat::SetP3(Vector3i point) {
+	p0 = point;
+	emit_changed();
+}
+void MapCamDat::SetRoll(Vector2 r) {
+	roll = r;
+	emit_changed();
+}
+void MapCamDat::SetFOV(Vector2 f) {
+	fov = f;
+	emit_changed();
 }
