@@ -122,12 +122,12 @@ bool SgCameraInspectorPlugin::_parse_property(Object *p_object, Variant::Type p_
 			label->set_text("Cam Type: ");
 
 			OptionButton *opt = memnew(OptionButton);
-			opt->add_item("0");
-			opt->add_item("1");
-			opt->add_item("2");
-			opt->add_item("3");
-			opt->add_item("4");
-			opt->add_item("5");
+			opt->add_item("0: Static Fixed Camera");
+			opt->add_item("1: Fixed Camera to Target Offset");
+			opt->add_item("2: Fixed Interest, On The Rails Position");
+			opt->add_item("3: Camera Rail To Target");
+			opt->add_item("4: Camera Rail To Target Rail");
+			opt->add_item("5: Position = Player + Offset");
 			opt->select(mcd->GetCamType());
 
 			opt->connect("item_selected", callable_mp(mcd, &MapCamDat::SetCamType));

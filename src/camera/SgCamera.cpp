@@ -2,6 +2,7 @@
 #include "camera/CameraEffects.h"
 #include "camera/CameraMath.h"
 #include "camera/MapCamDat.h"
+#include "plyr_ctl.h"
 #include <sys/types.h>
 
 #include <godot_cpp/classes/control.hpp>
@@ -12,6 +13,9 @@
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/property_info.hpp>
+#include <godot_cpp/variant/plane.hpp>
+#include <godot_cpp/variant/rect2.hpp>
+#include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/variant.hpp>
 
 #include <godot_cpp/classes/display_server.hpp>
@@ -75,6 +79,8 @@ SgCamera::SgCamera() {
 	mcd.instantiate();
 	interestPoint = memnew(RayCast3D);
 	camera_rid = server->camera_create();
+
+	boundingBox = memnew(Plane);
 
 	statusControl = memnew(Control);
 	pointStatus = memnew(Label);
@@ -167,8 +173,9 @@ void SgCamera::_notification(int p_what) {
 
 		case NOTIFICATION_TRANSFORM_CHANGED: {
 			if (camera_rid.is_valid()) {
-				camera.position = get_global_transform().get_origin();
-
+				camera.position = get_global_position();
+				Transform3D t = get_global_transform();
+				t.set_origin(camera.position);
 				RenderingServer::get_singleton()->camera_set_transform(camera_rid, get_global_transform());
 			}
 			_request_camera_update();
@@ -192,9 +199,13 @@ void SgCamera::_notification(int p_what) {
 	}
 }
 
-void SgCamera::CameraMain() {
-	NormalCameraCtrl();
-	//effects.QuakeCamera();
+Projection SgCamera::_get_camera_projection(real_t p_near) const {
+	Size2 viewport_size = get_viewport()->get_visible_rect().size;
+	Projection cm;
+
+	cm.set_perspective(camera.fov, viewport_size.aspect(), p_near, camera.farz, keep_aspect == KEEP_WIDTH);
+
+	return cm;
 }
 
 void SgCamera::DramaCameraReqCtrl() {
@@ -485,6 +496,11 @@ int SgCamera::CompleReqChk(MAP_CAM_INFO *mci) {
 	return req;
 }
 
+void SgCamera::GetCameraData(u_char kind, MAP_CAM_INFO *mci) {
+	mci->mcd = mcd;
+	mci->type = mcd->cam_type;
+}
+
 void SgCamera::NormalCameraCtrl() {
 	MAP_CAM_INFO mci;
 	int cam_id;
@@ -495,10 +511,20 @@ void SgCamera::NormalCameraCtrl() {
 	int debug = false;
 	int cd_edit_end;
 
+	if (Engine::get_singleton()->is_editor_hint()) {
+		return;
+	}
+
 	DramaCameraReqCtrl();
 
+	if (GetCameraInfo(&mci) != 0) {
+		return;
+	}
+
 	if (mci.change != 0) {
-		//plyr_wrk->cp_old = camera.position;
+		plyr_wrk->cp_old[0] = camera.position[0];
+		plyr_wrk->cp_old[1] = camera.position[1];
+		plyr_wrk->cp_old[2] = camera.position[2];
 	}
 
 	// Type of angles?
@@ -529,20 +555,26 @@ void SgCamera::NormalCameraCtrl() {
 	if (plyr_wrk)
 		plyr_wrk->prot = GetTrgtRotY(camera.position, plyr_wrk->get_global_position());
 
-	godot::UtilityFunctions::print("Position: ", camera.position);
-	godot::UtilityFunctions::print("Interest: ", camera.interest);
 	oc = tc2;
 
-	tc.position = get_global_position();
-	tc.roll = get_global_rotation().y;
-
 	camera.interest = tc.interest;
+	camera.position = tc.position;
+
 	camera.roll = tc.roll;
+	camera.fov = tc.fov;
+
+	Transform3D trans = get_global_transform();
+	trans.set_origin(camera.position);
+
+	set_transform(trans);
 }
 
 void SgCamera::_ready() {
 	godot::UtilityFunctions::print("my extension is initialised");
 	viewport = get_viewport();
+	if (get_owner() != nullptr)
+		// ToDo, GetBody from Area3D
+		plyr_wrk = get_owner()->get_node<Plyr_Wrk>("plyr_wrk");
 }
 
 void SgCamera::_request_camera_update() {
@@ -577,22 +609,37 @@ void SgCamera::_update_camera_mode() {
 	set_physics_process_internal(false);
 }
 
-Transform3D SgCamera::_get_adjusted_camera_transform(const Transform3D &p_xform) {
+Transform3D SgCamera::_get_adjusted_camera_transform(const Transform3D &p_xform) const {
+	Transform3D tr = p_xform.orthonormalized();
+	tr.origin += tr.basis.get_column(1); //* v_offset;
+	tr.origin += tr.basis.get_column(0); //* h_offset;
+	return tr;
 }
 
 Transform3D SgCamera::get_camera_transform() const {
-	Transform3D ret;
-	ret.origin = camera.position;
-	return ret;
+	return _get_adjusted_camera_transform(get_global_transform());
 }
 
 void SgCamera::_process(double delta) {
 	camera.interest = interestPoint->get_transform().get_origin() - interestPoint->get_global_transform().basis[2] * -100.0;
-	godot::UtilityFunctions::print("Interest: ", camera.interest);
+	//godot::UtilityFunctions::print("Interest: ", camera.interest);
+
+	NormalCameraCtrl();
+	//effects.QuakeCamera();
 }
 
 void SgCamera::_update_camera() {
-	CameraMain();
+	if (!is_inside_tree()) {
+		return;
+	}
+
+	if (!is_physics_interpolated_and_enabled()) {
+		RenderingServer::get_singleton()->camera_set_transform(camera_rid, get_camera_transform());
+	}
+
+	if (is_part_of_edited_scene() || !is_current()) {
+		return;
+	}
 }
 
 void SgCamera::make_current() {
@@ -647,7 +694,30 @@ void SgCamera::set_perspective(real_t p_fovy_degrees, real_t p_z_near, real_t p_
 }
 
 int SgCamera::GetCameraInfo(MAP_CAM_INFO *mci) {
-	return 1;
+	static int kind_old;
+
+	mci->change = 0;
+	GetCameraData(kind_old, mci);
+	if ((kind_old != 2 && drm_cam_req != 0) || ((kind_old == 2 && drm_cam_req == 0) || /*|| plyr_wrk.pr_info.camera_door != 0xffff*/ mci->no != mci->no_old)) {
+		mci->change = 1;
+		if (drm_cam_req != 0) {
+			if (kind_old == 2) {
+				mci->change = 0;
+			}
+
+			mci->kind = 2;
+		}
+		if (mci->kind != kind_old) {
+			compling = 0xffff;
+			GetCameraData(mci->kind, mci);
+		}
+
+		kind_old = mci->kind;
+	} else {
+		mci->kind = kind_old;
+	}
+
+	return 0;
 }
 
 void SgCamera::KonwakuCamCtrl() {
@@ -676,6 +746,9 @@ float SgCamera::GetMCLocalPosPer(u_short cn, u_char kind, u_char id) {
 	u_short xmax;
 	u_short zmin;
 	u_short zmax;
+
+	Point2 minMax;
+
 	u_char kind_tbl[4] = { 1, 2, 3, 4 };
 	static float min;
 	static float max;
@@ -716,7 +789,7 @@ void SgCamera::SetCamPos0(SgCameraData *tc) {
 	Vector3 tv = Vector3();
 
 	// Replace this with the player's global position
-	//GetMCLocalPosPer(0, 0, 0xff);
+	GetMCLocalPosPer(0, 0, 0xff);
 	tc->interest = Vector3((short)mcd->p0.y, mcd->p0.x, mcd->p0.z);
 
 	godot::UtilityFunctions::print("Interest: ", tc->interest);
@@ -857,6 +930,7 @@ void SgCamera::SetCamPos4(SgCameraData *tc, MAP_CAM_INFO *mci) {
 	Vector3 bv;
 	float per;
 
+	// Bounds check
 	per = GetMCLocalPosPer(mci->no, mci->kind, mci->mcd->id);
 
 	tv[0] = ((u_short)mci->mcd->p1[0] - (u_short)mci->mcd->p0[0]) * per;
@@ -970,12 +1044,8 @@ int SgCamera::SetMapCamDat0(Ref<MapCamDat> mcd) {
 	int i;
 	godot::UtilityFunctions::print("SetMapCamDat0");
 
-	Vector3 pos = get_global_position();
-
 	mcd->type = 0;
 	mcd->id = 0;
-
-	camera.position = pos;
 
 	for (i = 0; i < 3; i++) {
 		mcd->p0[i] = camera.interest[i];

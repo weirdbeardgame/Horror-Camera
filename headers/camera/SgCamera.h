@@ -78,17 +78,23 @@ struct SgCameraData {
 	Vector3 yd;
 };
 
+enum KeepAspect {
+	KEEP_WIDTH,
+	KEEP_HEIGHT
+};
+
 class SgCamera : public Node3D {
 	GDCLASS(SgCamera, Node3D)
 
 protected:
 	void _update_camera();
-	virtual void _request_camera_update();
+
 	void _update_camera_mode();
-
 	static void _bind_methods();
-
 	void _notification(int p_what);
+	virtual void _request_camera_update();
+	Projection _get_camera_projection(real_t p_near) const;
+	virtual Transform3D _get_adjusted_camera_transform(const Transform3D &p_xform) const;
 
 private:
 	bool isActive;
@@ -117,6 +123,8 @@ private:
 	Viewport *viewport;
 	RenderingServer *server;
 
+	Plane *boundingBox;
+
 	Plyr_Wrk *plyr_wrk;
 
 	// Culling layer mask
@@ -131,6 +139,8 @@ private:
 	// UI Stuff
 	Control *statusControl;
 	Label *pointStatus;
+
+	KeepAspect keep_aspect;
 
 	void _update_projection();
 	void _attributes_changed();
@@ -150,7 +160,6 @@ public:
 	RID get_camera() const;
 	void set_perspective(real_t p_fovy_degrees, real_t p_z_near, real_t p_z_far);
 
-	void CameraMain();
 	void KonwakuCamCtrl();
 	void NormalCameraCtrl();
 
@@ -178,7 +187,6 @@ public:
 	void SetFocusData(int data) { camera_focus_data = data; }
 
 	float GetMCLocalPosPer(u_short cn, u_char kind, u_char id);
-	Transform3D _get_adjusted_camera_transform(const Transform3D &p_xform);
 	Transform3D get_camera_transform() const;
 
 	int GetCameraInfo(MAP_CAM_INFO *mci);
