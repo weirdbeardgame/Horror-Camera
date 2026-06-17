@@ -13,9 +13,11 @@
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/property_info.hpp>
+#include <godot_cpp/variant/basis.hpp>
 #include <godot_cpp/variant/plane.hpp>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/variant.hpp>
 
 #include <godot_cpp/classes/display_server.hpp>
@@ -173,10 +175,13 @@ void SgCamera::_notification(int p_what) {
 
 		case NOTIFICATION_TRANSFORM_CHANGED: {
 			if (camera_rid.is_valid()) {
-				camera.position = get_global_position();
+				cam_id_move.p = get_global_position();
 				Transform3D t = get_global_transform();
-				t.set_origin(camera.position);
-				RenderingServer::get_singleton()->camera_set_transform(camera_rid, get_global_transform());
+				t.set_origin(cam_id_move.p);
+
+				set_transform(t);
+
+				//RenderingServer::get_singleton()->camera_set_transform(camera_rid, t);
 			}
 			_request_camera_update();
 		} break;
@@ -621,11 +626,38 @@ Transform3D SgCamera::get_camera_transform() const {
 }
 
 void SgCamera::_process(double delta) {
-	camera.interest = interestPoint->get_transform().get_origin() - interestPoint->get_global_transform().basis[2] * -100.0;
 	//godot::UtilityFunctions::print("Interest: ", camera.interest);
 
-	NormalCameraCtrl();
-	//effects.QuakeCamera();
+	Transform3D t;
+
+	t = get_global_transform();
+
+	if (Engine::get_singleton()->is_editor_hint()) {
+		cam_id_move.i = interestPoint->to_global(Vector3()).direction_to(
+				interestPoint->to_global(interestPoint->get_target_position()));
+
+		GetTrgtRot(cam_id_move.p, cam_id_move.i, &cam_id_move.rot_x, 1);
+		GetTrgtRot(cam_id_move.p, cam_id_move.i, &cam_id_move.rot_y, 2);
+
+		RotFvector(cam_id_move.rot_x, t);
+		RotFvector(cam_id_move.rot_y, t);
+
+		//godot::UtilityFunctions::print("Rotation X: ", t.basis[0]);
+		//godot::UtilityFunctions::print("Rotation Y: ", t.basis[1]);
+		//godot::UtilityFunctions::print("Rotation Z: ", t.basis[2]);
+
+		plyr_adj[0] = plyr_adj[1] = plyr_adj[2] = plyr_adj[3] = 0;
+
+		mcd->type = 0;
+		//cd_step = 0;
+		//cam_id = 0;
+		cd_edit_end = 0;
+	}
+
+	else {
+		NormalCameraCtrl();
+		//effects.QuakeCamera();
+	}
 }
 
 void SgCamera::_update_camera() {
@@ -727,14 +759,16 @@ void SgCamera::KonwakuCamCtrl() {
 	Vector3 pos = Vector3(plyr_wrk->get_global_position().x, plyr_wrk->get_global_position().y, plyr_wrk->get_global_position().z);
 	Vector3 rot = Vector3(plyr_wrk->get_global_rotation().x, plyr_wrk->get_global_rotation().y, plyr_wrk->get_global_rotation().z);
 
+	Transform3D t = get_global_transform();
+
 	tv = Vector3(0.0f, -500.0f, 800.0f);
 
-	RotFvector(rot, tv);
+	RotFvector(rot, t);
 	camera.interest = pos + tv;
 
 	tv = Vector3(0.0f, -950.0f, -400.0f);
 
-	RotFvector(rot, tv);
+	RotFvector(rot, t);
 	camera.position = pos + tv;
 
 	camera.roll = PI;
@@ -805,35 +839,22 @@ void SgCamera::SetCamPos0(SgCameraData *tc) {
 
 void SgCamera::SetCamPos1(SgCameraData *tc) {
 	Vector3 tv2;
-	static Vector3 tv = { 0.0f, 0.0f, 0.0f };
-
-	Vector3 pos = Vector3(plyr_wrk->get_global_position().x, plyr_wrk->get_global_position().y, plyr_wrk->get_global_position().z);
-	Vector3 rot = Vector3(plyr_wrk->get_global_rotation().x, plyr_wrk->get_global_rotation().y, plyr_wrk->get_global_rotation().z);
+	static Vector3 tv = Vector3();
+	Vector3 pos = plyr_wrk->get_global_position();
+	Vector3 rot = plyr_wrk->get_global_rotation();
+	Transform3D t = get_global_transform();
 
 	GetMCLocalPosPer(0, 0, 0xff);
 
-	tv[0] = (short)mcd->p1[0];
-	tv[1] = (short)mcd->p1[1];
-	tv[2] = (short)mcd->p1[2];
-
-	RotFvector(rot, tv);
+	tv = Vector3((short)mcd->p1[0], (short)mcd->p1[1], (short)mcd->p1[2]);
+	RotFvector(rot, t);
 
 	tv2 = pos + tv;
-
-	tc->interest[0] = tv2[0];
-	tc->interest[1] = tv2[1] + -400.0f;
-	tc->interest[2] = tv2[2];
-
-	tv2[0] = mcd->p0[0];
-	tv2[1] = (short)mcd->p0[1];
-	tv2[2] = mcd->p0[2];
-
-	tc->position[0] = tv2[0];
-	tc->position[1] = tv2[1];
-	tc->position[2] = tv2[2];
-
-	tc->roll = mcd->roll[0];
-	tc->fov = mcd->fov[0];
+	tc->interest = Vector3(tv2[0], tv2[1] + -400.0f, tv2[2]);
+	tv2 = Vector3(mcd->p0[0], (short)mcd->p0[1], mcd->p0[2]);
+	tc->position = Vector3(tv2[0], tv2[1], tv2[2]);
+	tc->roll = mcd->roll.x;
+	tc->fov = mcd->fov.x;
 }
 
 void SgCamera::SetCamPos2(SgCameraData *tc, MAP_CAM_INFO *mci) {
@@ -881,13 +902,15 @@ void SgCamera::SetCamPos3(SgCameraData *tc, MAP_CAM_INFO *mci) {
 	float per;
 	static Vector3 tv = { 0.0f, 0.0f, 0.0f };
 
-	Vector3 pos = Vector3(plyr_wrk->get_global_position().x, plyr_wrk->get_global_position().y, plyr_wrk->get_global_position().z);
-	Vector3 rot = Vector3(plyr_wrk->get_global_rotation().x, plyr_wrk->get_global_rotation().y, plyr_wrk->get_global_rotation().z);
+	Vector3 pos = plyr_wrk->get_global_position();
+	Vector3 rot = plyr_wrk->get_global_rotation();
+
+	Transform3D t = get_global_transform();
 
 	tv = Vector3((short)mcd->p2[0], (short)mcd->p2[1], (short)mcd->p2[2]);
-	RotFvector(rot, tv);
+	RotFvector(rot, t);
 
-	tv2 = pos + tv;
+	tv2 = pos + t.origin;
 	tv2[1] = tv2[1] + -400.0f;
 
 	tc->interest = tv2;
@@ -979,31 +1002,24 @@ void SgCamera::SetCamPos4(SgCameraData *tc, MAP_CAM_INFO *mci) {
 void SgCamera::SetCamPos5(SgCameraData *tc, MAP_CAM_INFO *mci) {
 	Vector3 tv2;
 	static Vector3 tv = { 0.0f, 0.0f, 0.0f };
-	Vector3 pos = Vector3(plyr_wrk->get_global_position().x, plyr_wrk->get_global_position().y, plyr_wrk->get_global_position().z);
-	Vector3 rot = Vector3(plyr_wrk->get_global_rotation().x, plyr_wrk->get_global_rotation().y, plyr_wrk->get_global_rotation().z);
+	Vector3 pos = plyr_wrk->get_global_position();
+	Vector3 rot = plyr_wrk->get_global_rotation();
+
+	Transform3D t = get_global_transform();
 
 	GetMCLocalPosPer(0, 0x0, 0xff);
 
 	if (mci->change != 0x0) {
-		tv[0] = (short)mci->mcd->p1[0];
-		tv[1] = (short)mci->mcd->p1[1];
-		tv[2] = (short)mci->mcd->p1[2];
-
-		RotFvector(rot, tv);
+		tv = Vector3((short)mci->mcd->p1[0], (short)mci->mcd->p1[1], (short)mci->mcd->p1[2]);
+		RotFvector(rot, t);
 	}
 
-	tv2 = pos + tv;
+	tv2 = pos + t.origin;
 
-	tc->interest[0] = tv2[0];
-	tc->interest[1] = tv2[1] + -400.0f;
-	tc->interest[2] = tv2[2];
-
-	tv2[0] = (short)mci->mcd->p0[0];
-	tv2[1] = (short)mci->mcd->p0[1];
-	tv2[2] = (short)mci->mcd->p0[2];
+	tc->interest = Vector3(tv2[0], tv2[1] + -400.0f, tv2[2]);
+	tv2 = Vector3((short)mci->mcd->p0[0], (short)mci->mcd->p0[1], (short)mci->mcd->p0[2]);
 
 	tc->position = pos + tv2;
-
 	tc->roll = mci->mcd->roll[0];
 	tc->fov = mci->mcd->fov[0];
 }
@@ -1018,6 +1034,9 @@ SgCamera::~SgCamera() {
 // These are used in the original editor
 // These assign positions for "map cam dat"
 void SgCamera::CameraIdMoveCtrl() {
+	Vector3 tv = { 0.0f, 0.0f, 0.0f };
+	Vector3 rav = { 0.0f, 0.0f, 1000.0f };
+
 	switch (mcd->cam_type) {
 		case 0:
 			cd_edit_end = SetMapCamDat0(mcd);
@@ -1038,6 +1057,16 @@ void SgCamera::CameraIdMoveCtrl() {
 			cd_edit_end = SetMapCamDat5(mcd);
 			break;
 	}
+
+	//RotFvector(cam_id_move.rot_x, tv);
+	//RotFvector(cam_id_move.rot_y, tv);
+	//RotFvector(cam_id_move.rot_x, rav);
+	//RotFvector(cam_id_move.rot_y, rav);
+
+	tv = cam_id_move.p;
+	rav = cam_id_move.i;
+	camera.interest = cam_id_move.i;
+	camera.position = cam_id_move.p;
 }
 
 int SgCamera::SetMapCamDat0(Ref<MapCamDat> mcd) {

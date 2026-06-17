@@ -8,6 +8,7 @@
 size = Vector3(1, 1, 0.99121094)
 
 [sub_resource type="MapCamDat" id="MapCamDat_lc1oi"]
+p1 = Vector3i(7, 3, 31)
 
 [node name="Scene" unique_id=764998005 instance=ExtResource("1_lc1oi")]
 
@@ -27,4 +28,4 @@ shape = SubResource("BoxShape3D_8od7v")
 
 [node name="SgCamera" type="SgCamera" parent="." index="3" unique_id=243096084]
 mcd = SubResource("MapCamDat_lc1oi")
-transform = Transform3D(0.98153156, 0.054601055, 0.18334275, -0.13014305, 0.8930266, 0.43077415, -0.14020923, -0.4466792, 0.8836397, 8.0260935, 6.7113237, 36.48647)
+transform = Transform3D(0.9409632, -0.025476828, 0.33754888, -0.07885005, 0.9532384, 0.29175183, -0.32919747, -0.30114344, 0.8949535, 7.0203333, 3.2072897, 31.83765)

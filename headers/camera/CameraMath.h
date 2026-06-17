@@ -8,6 +8,7 @@ using namespace godot;
 
 #define PI 3.1415928f
 #define DEG2RAD(x) ((float)(x) * PI / 180.0f)
+#define HALF_PI 1.57079637050628662109e0f
 
 static void RotLimitChk(Vector3 rot) {
 	if (PI < rot[0]) {
@@ -25,89 +26,116 @@ static void RotLimitChk(float *rot) {
 	}
 }
 
-static void GetTrgtRot(Vector3 p0, Vector3 p1, Vector3 rot, int id) {
+static void GetTrgtRot(Vector3 p0, Vector3 p1, Vector3 *rot, int id) {
 	Vector3 dist;
 
-	rot = Vector3(0.0f, 0.0f, 0.0f);
+	Vector3 r;
+
+	r = Vector3(0.0f, 0.0f, 0.0f);
 
 	dist = p1 - p0;
 
 	if (id & 0x1) {
-		dist[3] = p0.distance_to(p1);
+		dist[2] = p0.distance_to(p1);
 
-		rot[0] = Math::atan2(-dist[1], dist[3]);
+		r[0] = Math::atan2(-dist[1], dist[2]);
 
-		RotLimitChk(rot);
+		RotLimitChk(&r[0]);
 	}
 
 	if (id & 0x2) {
-		rot[1] = Math::atan2(dist[0], dist[2]);
+		r[1] = Math::atan2(dist[0], dist[2]);
 
-		RotLimitChk(&rot[1]);
+		RotLimitChk(&r[1]);
 	}
+
+	*rot = r;
 }
 
 static void RotMatrixX(Transform3D &m0, const Transform3D &m1, float rx) {
-	float s = Math::sin(rx);
-	float c = Math::cos(rx);
+	float sin;
+	float cos;
+	int sign;
+	Basis out;
 
-	Transform3D out;
-	for (int i = 0; i < 4; i++) {
-		const Vector3 &col = m1.basis[i];
-		out.basis[i] = Vector3(
-				col.x, // 1*x + 0+0+0
-				c * col.y - s * col.z, // 0 + cos*y - sin*z + 0
-				s * col.y + c * col.z);
+	if (rx < 0.0f) {
+		rx = HALF_PI + rx;
+		sign = 1;
+	} else {
+		rx = HALF_PI - rx;
+		sign = 0;
 	}
-	m0 = out;
+
+	sin = Math::sin(rx);
+	cos = Math::cos(rx);
+
+	out[0][0] = 1.0f * m1.basis[0][0] + 0.0f * m1.basis[0][1] + 0.0f * m1.basis[0][2];
+	out[0][1] = 0.0f * m1.basis[0][0] + cos * m1.basis[0][1] + -sin * m1.basis[0][2] + 0.0f;
+	out[0][2] = 0.0f * m1.basis[0][0] + 0.0f * m1.basis[0][1] + 1.0f * m1.basis[0][2];
+
+	m0.basis = out;
 }
 
 static void RotMatrixY(Transform3D &m0, const Transform3D &m1, float ry) {
-	float s = Math::sin(ry);
-	float c = Math::cos(ry);
+	float sin;
+	float cos;
+	int sign;
+	Basis out;
 
-	Transform3D out;
-	for (int i = 0; i < 4; i++) {
-		const Vector3 &col = m1.basis[i];
-		out.basis[i] = Vector3(
-				col.x, // 1*x + 0+0+0
-				c * col.y - s * col.z, // 0 + cos*y - sin*z + 0
-				s * col.y + c * col.z);
+	if (ry < 0.0f) {
+		ry = HALF_PI + ry;
+		sign = 1;
+	} else {
+		ry = HALF_PI - ry;
+		sign = 0;
 	}
-	m0 = out;
+
+	sin = Math::sin(ry);
+	cos = Math::cos(ry);
+
+	out[1][0] = cos * m1.basis[1][0] + -sin * m1.basis[1][1] + 0.0f * m1.basis[1][2];
+	out[1][1] = sin * m1.basis[1][0] + cos * m1.basis[1][1] + 0.0f * m1.basis[1][2];
+	out[1][2] = 0.0f * m1.basis[1][0] + 0.0f * m1.basis[1][1] + 1.0f * m1.basis[1][2];
+
+	m0.basis = out;
 }
 
 static void RotMatrixZ(Transform3D &m0, const Transform3D &m1, float rz) {
-	float s = Math::sin(rz);
-	float c = Math::cos(rz);
+	float sin;
+	float cos;
+	int sign;
+	Basis out;
 
-	Transform3D out;
-	for (int i = 0; i < 4; i++) {
-		const Vector3 &col = m1.basis[i];
-		out.basis[i] = Vector3(
-				col.x,
-				c * col.y - s * col.z,
-				s * col.y + c * col.z);
+	if (rz < 0.0f) {
+		rz = HALF_PI + rz;
+		sign = 1;
+	} else {
+		rz = HALF_PI - rz;
+		sign = 0;
 	}
-	m0 = out;
+
+	sin = Math::sin(rz);
+	cos = Math::cos(rz);
+
+	out[2][0] = cos * m1.basis[2][0] + -sin * m1.basis[2][1] + 0.0f * m1.basis[2][2];
+	out[2][1] = sin * m1.basis[2][0] + cos * m1.basis[2][1] + 0.0f * m1.basis[2][2];
+	out[2][2] = 0.0f * m1.basis[2][0] + 0.0f * m1.basis[2][1] + 1.0f * m1.basis[2][2];
+
+	m0.basis = out;
 }
 
-static void RotFvector(Vector3 &rot, Vector3 &tv) {
+static void RotFvector(Vector3 &rot, Transform3D &rot_matrix) {
 	Transform3D work;
-	Transform3D rot_matrix;
 
 	work = Transform3D();
-	// sceVu0RotMatrixZ equivalent
 	if (rot.z != 0.0f) {
-		RotMatrixZ(rot_matrix, work, rot.z);
+		//RotMatrixZ(rot_matrix, work, rot.z);
 	}
 
-	// sceVu0RotMatrixX equivalent
 	if (rot.x != 0.0f) {
 		RotMatrixX(rot_matrix, work, rot.x);
 	}
 
-	// sceVu0RotMatrixY equivalent
 	if (rot.y != 0.0f) {
 		RotMatrixY(rot_matrix, work, rot.y);
 	}
