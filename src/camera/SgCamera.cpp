@@ -636,15 +636,14 @@ void SgCamera::_process(double delta) {
 		cam_id_move.i = interestPoint->to_global(Vector3()).direction_to(
 				interestPoint->to_global(interestPoint->get_target_position()));
 
-		GetTrgtRot(cam_id_move.p, cam_id_move.i, &cam_id_move.rot_x, 1);
-		GetTrgtRot(cam_id_move.p, cam_id_move.i, &cam_id_move.rot_y, 2);
+		GetTrgtRot(camera.position, camera.interest, &cam_id_move.rot_x, 1);
+		GetTrgtRot(camera.position, camera.interest, &cam_id_move.rot_y, 2);
 
 		RotFvector(cam_id_move.rot_x, t);
 		RotFvector(cam_id_move.rot_y, t);
 
-		//godot::UtilityFunctions::print("Rotation X: ", t.basis[0]);
-		//godot::UtilityFunctions::print("Rotation Y: ", t.basis[1]);
-		//godot::UtilityFunctions::print("Rotation Z: ", t.basis[2]);
+		camera.interest = cam_id_move.i;
+		camera.position = cam_id_move.p;
 
 		plyr_adj[0] = plyr_adj[1] = plyr_adj[2] = plyr_adj[3] = 0;
 

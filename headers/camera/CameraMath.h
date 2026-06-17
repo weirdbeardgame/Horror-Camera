@@ -93,9 +93,9 @@ static void RotMatrixY(Transform3D &m0, const Transform3D &m1, float ry) {
 	sin = Math::sin(ry);
 	cos = Math::cos(ry);
 
-	out[1][0] = cos * m1.basis[1][0] + -sin * m1.basis[1][1] + 0.0f * m1.basis[1][2];
-	out[1][1] = sin * m1.basis[1][0] + cos * m1.basis[1][1] + 0.0f * m1.basis[1][2];
-	out[1][2] = 0.0f * m1.basis[1][0] + 0.0f * m1.basis[1][1] + 1.0f * m1.basis[1][2];
+	out[1][0] = cos * m1.basis[1][0] + 0.0f * m1.basis[1][1] + sin * m1.basis[1][2];
+	out[1][1] = 0.0f * m1.basis[1][0] + 1.0f * m1.basis[1][1] + 0.0f * m1.basis[1][2];
+	out[1][2] = -sin * m1.basis[1][0] + 0.0f * m1.basis[1][1] + cos * m1.basis[1][2];
 
 	m0.basis = out;
 }
@@ -129,7 +129,7 @@ static void RotFvector(Vector3 &rot, Transform3D &rot_matrix) {
 
 	work = Transform3D();
 	if (rot.z != 0.0f) {
-		//RotMatrixZ(rot_matrix, work, rot.z);
+		RotMatrixZ(rot_matrix, work, rot.z);
 	}
 
 	if (rot.x != 0.0f) {
