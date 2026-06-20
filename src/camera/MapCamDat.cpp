@@ -22,7 +22,6 @@ MapCamDat::MapCamDat() {
 		ResourceSaver *save = ResourceSaver::get_singleton();
 		save->save(this, path);
 	}
-	map_cam_dat = RenderingServer::get_singleton()->camera_attributes_create();
 }
 
 void MapCamDat::_bind_methods() {
@@ -35,15 +34,15 @@ void MapCamDat::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("GetPointID"), &MapCamDat::GetPointID);
 	ClassDB::bind_method(D_METHOD("SetPointID", "0"), &MapCamDat::SetPointID);
 	ClassDB::bind_method(D_METHOD("GetP0"), &MapCamDat::GetP0);
-	ClassDB::bind_method(D_METHOD("SetP0"), &MapCamDat::SetP0);
+	ClassDB::bind_method(D_METHOD("SetP0", "p0"), &MapCamDat::SetP0);
 	ClassDB::bind_method(D_METHOD("GetP1"), &MapCamDat::GetP1);
-	ClassDB::bind_method(D_METHOD("SetP1"), &MapCamDat::SetP1);
+	ClassDB::bind_method(D_METHOD("SetP1", "p1"), &MapCamDat::SetP1);
 	ClassDB::bind_method(D_METHOD("GetP2"), &MapCamDat::GetP2);
-	ClassDB::bind_method(D_METHOD("SetP2"), &MapCamDat::SetP2);
+	ClassDB::bind_method(D_METHOD("SetP2", "p2"), &MapCamDat::SetP2);
 	ClassDB::bind_method(D_METHOD("GetP3"), &MapCamDat::GetP3);
-	ClassDB::bind_method(D_METHOD("SetP3"), &MapCamDat::SetP3);
+	ClassDB::bind_method(D_METHOD("SetP3", "p3"), &MapCamDat::SetP3);
 	ClassDB::bind_method(D_METHOD("GetRoll"), &MapCamDat::GetRoll);
-	ClassDB::bind_method(D_METHOD("SetRoll"), &MapCamDat::SetRoll);
+	ClassDB::bind_method(D_METHOD("SetRoll", "roll"), &MapCamDat::SetRoll);
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "camType"), "SetCamType", "GetCamType");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "camKind"), "SetCamKind", "GetCamKind");

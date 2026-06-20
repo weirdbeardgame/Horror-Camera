@@ -1,10 +1,10 @@
-#include "camera/SgCamera.h"
 #include "camera/CameraEffects.h"
 #include "camera/CameraMath.h"
 #include "camera/MapCamDat.h"
 #include "plyr_ctl.h"
 #include <sys/types.h>
 
+#include <cstdint>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/label.hpp>
@@ -74,18 +74,19 @@ SgCamera::SgCamera() {
 	camera_focus_enabled = false;
 	camera_focus_data = 0;
 
-	camera = SgCameraData();
+	cameraData = SgCameraData();
 	server = RenderingServer::get_singleton();
 	plyr_wrk = Object::cast_to<Plyr_Wrk>(get_parent());
 
 	mcd.instantiate();
-	interestPoint = memnew(RayCast3D);
-	camera_rid = server->camera_create();
+	camera = server->camera_create();
+
+	attributes = RenderingServer::get_singleton()->camera_attributes_create();
 
 	boundingBox = memnew(Plane);
-
 	statusControl = memnew(Control);
 	pointStatus = memnew(Label);
+	interestNode = memnew(Node3D);
 
 	add_child(statusControl);
 	statusControl->set_anchors_preset(Control::PRESET_TOP_RIGHT);
@@ -94,17 +95,14 @@ SgCamera::SgCamera() {
 	pointStatus->set_offset(SIDE_RIGHT, -200);
 
 	set_perspective(44.0f, 0.1f, 32768.0f);
-	RenderingServer::get_singleton()->camera_set_cull_mask(camera_rid, layers);
+	RenderingServer::get_singleton()->camera_set_cull_mask(camera, layers);
 
-	if (mcd.is_valid()) {
-		godot::UtilityFunctions::print("Valid attributes");
-		server->camera_set_camera_attributes(camera_rid, mcd->get_rid());
+	add_child(interestNode);
+	interestNode->set_position(Vector3(0, 0, -100));
+
+	if (attributes.is_valid()) {
+		server->camera_set_camera_attributes(camera, attributes);
 	}
-
-	add_child(interestPoint);
-
-	interestPoint->set_enabled(true);
-	interestPoint->set_target_position(Vector3(0, 0, -100));
 
 	set_notify_transform(true);
 	set_disable_scale(true);
@@ -122,6 +120,10 @@ void SgCamera::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("GetMapCamDat"), &SgCamera::GetMapCamDat);
 
+	ClassDB::bind_method(D_METHOD("GetPosition"), &SgCamera::GetPosition);
+	ClassDB::bind_method(D_METHOD("SetPosition", "position"), &SgCamera::SetPosition);
+	ClassDB::bind_method(D_METHOD("GetInterest"), &SgCamera::GetInterest);
+	ClassDB::bind_method(D_METHOD("SetInterest", "interest"), &SgCamera::SetInterest);
 	ClassDB::bind_method(D_METHOD("get_fov"), &SgCamera::get_fov);
 	ClassDB::bind_method(D_METHOD("set_fov", "fov"), &SgCamera::set_fov);
 	ClassDB::bind_method(D_METHOD("get_farz"), &SgCamera::get_farz);
@@ -147,6 +149,9 @@ void SgCamera::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "camera_focus_data"), "SetFocusData", "GetFocusData");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "mcd", PROPERTY_HINT_RESOURCE_TYPE, "MapCamDat"), "SetMapCamDat", "GetMapCamDat");
 
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "Position"), "SetPosition", "GetPosition");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "Interest"), "SetInterest", "GetInterest");
+
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fov", PROPERTY_HINT_RANGE, "1,179,0.1,degrees"), "set_fov", "get_fov");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "nearz", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,exp,suffix:m"), "set_nearz", "get_nearz");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "farz", PROPERTY_HINT_RANGE, "0.01,4000,0.01,or_greater,exp,suffix:m"), "set_farz", "get_farz");
@@ -160,9 +165,9 @@ void SgCamera::_notification(int p_what) {
 				return;
 			}
 
-			if (current && camera_rid.is_valid()) {
+			if (current && camera.is_valid()) {
 				godot::UtilityFunctions::print("Attach Camera Safely");
-				server->viewport_attach_camera(viewport->get_viewport_rid(), camera_rid);
+				server->viewport_attach_camera(viewport->get_viewport_rid(), camera);
 			}
 
 #ifdef TOOLS_ENABLED
@@ -174,7 +179,7 @@ void SgCamera::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_TRANSFORM_CHANGED: {
-			if (camera_rid.is_valid()) {
+			if (camera.is_valid()) {
 				cam_id_move.p = get_global_position();
 				Transform3D t = get_global_transform();
 				t.set_origin(cam_id_move.p);
@@ -208,7 +213,7 @@ Projection SgCamera::_get_camera_projection(real_t p_near) const {
 	Size2 viewport_size = get_viewport()->get_visible_rect().size;
 	Projection cm;
 
-	cm.set_perspective(camera.fov, viewport_size.aspect(), p_near, camera.farz, keep_aspect == KEEP_WIDTH);
+	cm.set_perspective(cameraData.fov, viewport_size.aspect(), p_near, cameraData.farz, keep_aspect == KEEP_WIDTH);
 
 	return cm;
 }
@@ -307,7 +312,7 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 				comple_dwn_tm = comple_cnt / 2;
 			}
 
-			comple_adjr = tc->interest + camera.interest;
+			comple_adjr = tc->interest + cameraData.interest;
 			comple_adjr /= comple_div;
 
 			rmax = (fabsf(comple_adjr[0]) > fabsf(comple_adjr[1]))
@@ -317,7 +322,7 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 					? rmax
 					: 2;
 
-			comple_adjp = tc->position + camera.position;
+			comple_adjp = tc->position + cameraData.position;
 			comple_adjp /= comple_div;
 
 			pmax = (fabsf(comple_adjr[0]) > fabsf(comple_adjr[1]))
@@ -327,10 +332,10 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 					? pmax
 					: 2;
 
-			comple_adjfov = (tc->fov - camera.fov);
+			comple_adjfov = (tc->fov - cameraData.fov);
 			comple_adjfov /= comple_div;
 
-			comple_adjroll = tc->roll - camera.roll;
+			comple_adjroll = tc->roll - cameraData.roll;
 
 			RotLimitChk(&comple_adjroll);
 
@@ -346,7 +351,7 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 
 			tc1 = comple_adjp;
 			tca0 = tc0.distance_to(tc1);
-			tc1 = tc->position - camera.position;
+			tc1 = tc->position - cameraData.position;
 
 			tc0 = Vector3();
 
@@ -366,7 +371,7 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 				tc1 = comple_adjr;
 
 				tca0 = tc0.distance_to(tc1);
-				tc1 = tc->interest - camera.interest;
+				tc1 = tc->interest - cameraData.interest;
 
 				tc0 = Vector3();
 				tca1 = tc0.distance_to(tc1);
@@ -398,8 +403,8 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 	tc0 = tc->interest;
 
 	for (i = 0; i < 3; i++) {
-		if (comple_adjr[i] > 0.0f && tc->interest[i] > camera.interest[i]) {
-			tc->interest[i] = camera.interest[i] + comple_adjr[i];
+		if (comple_adjr[i] > 0.0f && tc->interest[i] > cameraData.interest[i]) {
+			tc->interest[i] = cameraData.interest[i] + comple_adjr[i];
 
 			if (tc0[i] <= tc->interest[i]) {
 				tc->interest = tc0;
@@ -409,8 +414,8 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 
 			chk = 1;
 		} else {
-			if (comple_adjr[i] < 0.0f && tc->interest[i] < camera.interest[i]) {
-				tc->interest[i] = camera.interest[i] + comple_adjr[i];
+			if (comple_adjr[i] < 0.0f && tc->interest[i] < cameraData.interest[i]) {
+				tc->interest[i] = cameraData.interest[i] + comple_adjr[i];
 
 				if (tc->interest[i] <= tc0[i]) {
 					tc->interest = tc0;
@@ -426,8 +431,8 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 	tc0 = tc->position;
 
 	for (i = 0; i < 3; i++) {
-		if (comple_adjp[i] > 0.0f && tc->position[i] > camera.position[i]) {
-			tc->position[i] = camera.position[i] + comple_adjp[i];
+		if (comple_adjp[i] > 0.0f && tc->position[i] > cameraData.position[i]) {
+			tc->position[i] = cameraData.position[i] + comple_adjp[i];
 
 			if (tc0[i] <= tc->position[i]) {
 				tc->position = tc0;
@@ -439,8 +444,8 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 
 			chk = 1;
 		} else {
-			if (comple_adjp[i] < 0.0f && tc->position[i] < camera.position[i]) {
-				tc->position[i] = camera.position[i] + comple_adjp[i];
+			if (comple_adjp[i] < 0.0f && tc->position[i] < cameraData.position[i]) {
+				tc->position[i] = cameraData.position[i] + comple_adjp[i];
 
 				if (tc->position[i] <= tc0[i]) {
 					tc->position = tc0;
@@ -452,15 +457,15 @@ void SgCamera::CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO 
 		}
 	}
 
-	if ((comple_adjfov > 0.0f && tc->fov > camera.fov) || (comple_adjfov < 0.0f && tc->fov < camera.fov)) {
-		tc->fov = camera.fov + comple_adjfov;
+	if ((comple_adjfov > 0.0f && tc->fov > cameraData.fov) || (comple_adjfov < 0.0f && tc->fov < cameraData.fov)) {
+		tc->fov = cameraData.fov + comple_adjfov;
 		chk = 1;
 	} else {
 		comple_adjfov = 0.0f;
 	}
 
-	if ((comple_adjroll > 0.0f && tc->roll > camera.roll) || (comple_adjroll < 0.0f && tc->roll < camera.roll)) {
-		tc->roll = camera.roll + comple_adjroll;
+	if ((comple_adjroll > 0.0f && tc->roll > cameraData.roll) || (comple_adjroll < 0.0f && tc->roll < cameraData.roll)) {
+		tc->roll = cameraData.roll + comple_adjroll;
 		chk = 1;
 	} else {
 		comple_adjroll = 0.0f;
@@ -527,9 +532,9 @@ void SgCamera::NormalCameraCtrl() {
 	}
 
 	if (mci.change != 0) {
-		plyr_wrk->cp_old[0] = camera.position[0];
-		plyr_wrk->cp_old[1] = camera.position[1];
-		plyr_wrk->cp_old[2] = camera.position[2];
+		plyr_wrk->cp_old[0] = cameraData.position[0];
+		plyr_wrk->cp_old[1] = cameraData.position[1];
+		plyr_wrk->cp_old[2] = cameraData.position[2];
 	}
 
 	// Type of angles?
@@ -558,18 +563,18 @@ void SgCamera::NormalCameraCtrl() {
 	CompleCameraPos(&tc, &oc, &mci);
 
 	if (plyr_wrk)
-		plyr_wrk->prot = GetTrgtRotY(camera.position, plyr_wrk->get_global_position());
+		plyr_wrk->prot = GetTrgtRotY(cameraData.position, plyr_wrk->get_global_position());
 
 	oc = tc2;
 
-	camera.interest = tc.interest;
-	camera.position = tc.position;
+	cameraData.interest = tc.interest;
+	cameraData.position = tc.position;
 
-	camera.roll = tc.roll;
-	camera.fov = tc.fov;
+	cameraData.roll = tc.roll;
+	cameraData.fov = tc.fov;
 
 	Transform3D trans = get_global_transform();
-	trans.set_origin(camera.position);
+	trans.set_origin(cameraData.position);
 
 	set_transform(trans);
 }
@@ -587,18 +592,18 @@ void SgCamera::_request_camera_update() {
 }
 
 void SgCamera::set_fov(real_t fov) {
-	camera.fov = fov;
-	set_perspective(camera.fov, camera.nearz, camera.farz);
+	cameraData.fov = fov;
+	set_perspective(cameraData.fov, cameraData.nearz, cameraData.farz);
 }
 
 void SgCamera::set_nearz(real_t near) {
-	camera.nearz = near;
-	set_perspective(camera.fov, camera.nearz, camera.farz);
+	cameraData.nearz = near;
+	set_perspective(cameraData.fov, cameraData.nearz, cameraData.farz);
 }
 
 void SgCamera::set_farz(real_t far) {
-	camera.farz = far;
-	set_perspective(camera.fov, camera.nearz, camera.farz);
+	cameraData.farz = far;
+	set_perspective(cameraData.fov, cameraData.nearz, cameraData.farz);
 }
 
 void SgCamera::print_type(const Variant &p_variant) const {
@@ -606,7 +611,7 @@ void SgCamera::print_type(const Variant &p_variant) const {
 }
 
 RID SgCamera::get_camera() const {
-	return camera_rid;
+	return camera;
 }
 
 void SgCamera::_update_camera_mode() {
@@ -626,31 +631,29 @@ Transform3D SgCamera::get_camera_transform() const {
 }
 
 void SgCamera::_process(double delta) {
-	//godot::UtilityFunctions::print("Interest: ", camera.interest);
+	//godot::UtilityFunctions::print("Interest: ", cameraData.interest);
 
 	Transform3D t;
 
 	t = get_global_transform();
 
 	if (Engine::get_singleton()->is_editor_hint()) {
-		cam_id_move.i = interestPoint->to_global(Vector3()).direction_to(
-				interestPoint->to_global(interestPoint->get_target_position()));
+		cam_id_move.i = interestNode->get_global_position();
 
-		GetTrgtRot(camera.position, camera.interest, &cam_id_move.rot_x, 1);
-		GetTrgtRot(camera.position, camera.interest, &cam_id_move.rot_y, 2);
+		GetTrgtRot(cameraData.position, cameraData.interest, &cam_id_move.rot_x, 1);
+		GetTrgtRot(cameraData.position, cameraData.interest, &cam_id_move.rot_y, 2);
 
 		RotFvector(cam_id_move.rot_x, t);
 		RotFvector(cam_id_move.rot_y, t);
 
-		camera.interest = cam_id_move.i;
-		camera.position = cam_id_move.p;
+		cameraData.interest = cam_id_move.i;
+		cameraData.position = cam_id_move.p;
 
 		plyr_adj[0] = plyr_adj[1] = plyr_adj[2] = plyr_adj[3] = 0;
 
 		mcd->type = 0;
 		//cd_step = 0;
 		//cam_id = 0;
-		cd_edit_end = 0;
 	}
 
 	else {
@@ -665,7 +668,7 @@ void SgCamera::_update_camera() {
 	}
 
 	if (!is_physics_interpolated_and_enabled()) {
-		RenderingServer::get_singleton()->camera_set_transform(camera_rid, get_camera_transform());
+		RenderingServer::get_singleton()->camera_set_transform(camera, get_camera_transform());
 	}
 
 	if (is_part_of_edited_scene() || !is_current()) {
@@ -715,11 +718,11 @@ bool SgCamera::is_current() const {
 }
 
 void SgCamera::set_perspective(real_t p_fovy_degrees, real_t p_z_near, real_t p_z_far) {
-	camera.fov = p_fovy_degrees;
-	camera.nearz = p_z_near;
-	camera.farz = p_z_far;
+	cameraData.fov = p_fovy_degrees;
+	cameraData.nearz = p_z_near;
+	cameraData.farz = p_z_far;
 
-	RenderingServer::get_singleton()->camera_set_perspective(camera_rid, camera.fov, camera.nearz, camera.farz);
+	RenderingServer::get_singleton()->camera_set_perspective(camera, cameraData.fov, cameraData.nearz, cameraData.farz);
 	update_gizmos();
 	force_change = false;
 }
@@ -763,15 +766,15 @@ void SgCamera::KonwakuCamCtrl() {
 	tv = Vector3(0.0f, -500.0f, 800.0f);
 
 	RotFvector(rot, t);
-	camera.interest = pos + tv;
+	cameraData.interest = pos + tv;
 
 	tv = Vector3(0.0f, -950.0f, -400.0f);
 
 	RotFvector(rot, t);
-	camera.position = pos + tv;
+	cameraData.position = pos + tv;
 
-	camera.roll = PI;
-	camera.fov = 44.0f;
+	cameraData.roll = PI;
+	cameraData.fov = 44.0f;
 }
 
 float SgCamera::GetMCLocalPosPer(u_short cn, u_char kind, u_char id) {
@@ -825,12 +828,8 @@ void SgCamera::SetCamPos0(SgCameraData *tc) {
 	GetMCLocalPosPer(0, 0, 0xff);
 	tc->interest = Vector3((short)mcd->p0.y, mcd->p0.x, mcd->p0.z);
 
-	godot::UtilityFunctions::print("Interest: ", tc->interest);
-
 	tv = Vector3(mcd->p1[0], (short)mcd->p1[1], mcd->p1[2]);
-	tc->position = Vector3(tv[0], tv[1], tv[2]);
-
-	godot::UtilityFunctions::print("Position: ", tc->position);
+	tc->position = tv;
 
 	tc->roll = mcd->roll[0];
 	tc->fov = mcd->fov[0];
@@ -1025,8 +1024,8 @@ void SgCamera::SetCamPos5(SgCameraData *tc, MAP_CAM_INFO *mci) {
 
 SgCamera::~SgCamera() {
 	// Clean up the RID to prevent memory leaks
-	if (camera_rid.is_valid()) {
-		server->free_rid(camera_rid);
+	if (camera.is_valid()) {
+		server->free_rid(camera);
 	}
 }
 
@@ -1038,22 +1037,22 @@ void SgCamera::CameraIdMoveCtrl() {
 
 	switch (mcd->cam_type) {
 		case 0:
-			cd_edit_end = SetMapCamDat0(mcd);
+			SetMapCamDat0(mcd);
 			break;
 		case 1:
-			cd_edit_end = SetMapCamDat1(mcd);
+			SetMapCamDat1(mcd);
 			break;
 		case 2:
-			cd_edit_end = SetMapCamDat2(mcd, 0);
+			SetMapCamDat2(mcd, 0);
 			break;
 		case 3:
-			cd_edit_end = SetMapCamDat3(mcd, 0);
+			SetMapCamDat3(mcd, 0);
 			break;
 		case 4:
-			cd_edit_end = SetMapCamDat4(mcd, 0);
+			SetMapCamDat4(mcd, 0);
 			break;
 		case 5:
-			cd_edit_end = SetMapCamDat5(mcd);
+			SetMapCamDat5(mcd);
 			break;
 	}
 
@@ -1064,8 +1063,8 @@ void SgCamera::CameraIdMoveCtrl() {
 
 	tv = cam_id_move.p;
 	rav = cam_id_move.i;
-	camera.interest = cam_id_move.i;
-	camera.position = cam_id_move.p;
+	cameraData.interest = cam_id_move.i;
+	cameraData.position = cam_id_move.p;
 }
 
 int SgCamera::SetMapCamDat0(Ref<MapCamDat> mcd) {
@@ -1076,18 +1075,18 @@ int SgCamera::SetMapCamDat0(Ref<MapCamDat> mcd) {
 	mcd->id = 0;
 
 	for (i = 0; i < 3; i++) {
-		mcd->p0[i] = camera.interest[i];
+		mcd->p0[i] = cameraData.interest[i];
 	}
 
 	for (i = 0; i < 3; i++) {
-		mcd->p1[i] = camera.position[i];
+		mcd->p1[i] = cameraData.position[i];
 	}
 
 	mcd->p2 = Vector3i();
 	mcd->p3 = Vector3i();
 
-	mcd->roll = Vector2(camera.roll, 0.0f);
-	mcd->fov = Vector2(camera.fov, 0.0f);
+	mcd->roll = Vector2(cameraData.roll, 0.0f);
+	mcd->fov = Vector2(cameraData.fov, 0.0f);
 
 	return 1;
 }
@@ -1097,7 +1096,7 @@ int SgCamera::SetMapCamDat1(Ref<MapCamDat> mcd) {
 	mcd->id = 0;
 
 	for (int i = 0; i < 3; i++) {
-		mcd->p0[i] = camera.position[i];
+		mcd->p0[i] = cameraData.position[i];
 	}
 
 	for (int i = 0; i < 3; i++) {
@@ -1107,8 +1106,8 @@ int SgCamera::SetMapCamDat1(Ref<MapCamDat> mcd) {
 	mcd->p2 = Vector3i();
 	mcd->p3 = Vector3i();
 
-	mcd->roll = Vector2(camera.roll, 0.0f);
-	mcd->fov = Vector2(camera.fov, 0.0f);
+	mcd->roll = Vector2(cameraData.roll, 0.0f);
+	mcd->fov = Vector2(cameraData.fov, 0.0f);
 
 	return 1;
 }
@@ -1122,11 +1121,11 @@ int SgCamera::SetMapCamDat2(Ref<MapCamDat> mcd, int id) {
 	end = 0;
 
 	for (int i = 0; i < 3; i++) {
-		tmpd->p0[i] = (u_short)camera.interest[i];
+		tmpd->p0[i] = (u_short)cameraData.interest[i];
 	}
 
 	for (int i = 0; i < 3; i++) {
-		tmpd->p1[i] = (u_short)camera.position[i];
+		tmpd->p1[i] = (u_short)cameraData.position[i];
 	}
 
 	switch (mcd->pointID) {
@@ -1134,31 +1133,31 @@ int SgCamera::SetMapCamDat2(Ref<MapCamDat> mcd, int id) {
 			mcd->type = 2;
 
 			for (int i = 0; i < 3; i++) {
-				tmpd->p0[i] = (u_short)(int)camera.interest[i];
+				tmpd->p0[i] = (u_short)(int)cameraData.interest[i];
 			}
 
 			for (int i = 0; i < 3; i++) {
-				tmpd->p1[i] = camera.position[i];
+				tmpd->p1[i] = cameraData.position[i];
 			}
 
-			mcd->roll[0] = camera.roll;
-			mcd->fov[0] = camera.fov;
+			mcd->roll[0] = cameraData.roll;
+			mcd->fov[0] = cameraData.fov;
 
 			mcd->pointID++;
 			break;
 		case 1:
 			for (int i = 0; i < 3; i++) {
-				tmpd->p2[i] = camera.position[i];
+				tmpd->p2[i] = cameraData.position[i];
 			}
 
-			if (mcd->roll[0] != camera.roll) {
-				mcd->roll[1] = camera.roll;
+			if (mcd->roll[0] != cameraData.roll) {
+				mcd->roll[1] = cameraData.roll;
 			} else {
 				mcd->roll[1] = 0.0f;
 			}
 
-			if (mcd->fov[0] != camera.fov) {
-				mcd->fov[1] = camera.fov;
+			if (mcd->fov[0] != cameraData.fov) {
+				mcd->fov[1] = cameraData.fov;
 			} else {
 				mcd->fov[1] = 0.0f;
 			}
@@ -1207,27 +1206,27 @@ int SgCamera::SetMapCamDat3(Ref<MapCamDat> mcd, int id) {
 			mcd->type = 3;
 
 			for (i = 0; i < 3; i++) {
-				tmpd->p0[i] = camera.position[i];
+				tmpd->p0[i] = cameraData.position[i];
 			}
 
-			mcd->roll[0] = camera.roll;
-			mcd->fov[0] = camera.fov;
+			mcd->roll[0] = cameraData.roll;
+			mcd->fov[0] = cameraData.fov;
 
 			mcd->pointID++;
 			break;
 		case 1:
 			for (i = 0; i < 3; i++) {
-				tmpd->p1[i] = camera.position[i];
+				tmpd->p1[i] = cameraData.position[i];
 			}
 
-			if (mcd->roll[0] != camera.roll) {
-				mcd->roll[1] = camera.roll;
+			if (mcd->roll[0] != cameraData.roll) {
+				mcd->roll[1] = cameraData.roll;
 			} else {
 				mcd->roll[1] = 0.0f;
 			}
 
-			if (mcd->fov[0] != camera.fov) {
-				mcd->fov[1] = camera.fov;
+			if (mcd->fov[0] != cameraData.fov) {
+				mcd->fov[1] = cameraData.fov;
 			} else {
 				mcd->fov[1] = 0.0f;
 			}
@@ -1275,36 +1274,36 @@ int SgCamera::SetMapCamDat4(Ref<MapCamDat> mcd, int id) {
 			mcd->type = 4;
 
 			for (i = 0; i < 3; i++) {
-				tmpd->p0[i] = camera.interest[i];
+				tmpd->p0[i] = cameraData.interest[i];
 			}
 
 			for (i = 0; i < 3; i++) {
-				tmpd->p2[i] = camera.position[i];
+				tmpd->p2[i] = cameraData.position[i];
 			}
 
-			mcd->roll[0] = camera.roll;
-			mcd->fov[0] = camera.fov;
+			mcd->roll[0] = cameraData.roll;
+			mcd->fov[0] = cameraData.fov;
 
 			pointStatus->set_text("Point 1 Set");
 			mcd->pointID++;
 			break;
 		case 1:
 			for (i = 0; i < 3; i++) {
-				tmpd->p1[i] = (u_short)(int)camera.interest[i];
+				tmpd->p1[i] = (u_short)(int)cameraData.interest[i];
 			}
 
 			for (i = 0; i < 3; i++) {
-				tmpd->p3[i] = (u_short)(int)camera.position[i];
+				tmpd->p3[i] = (u_short)(int)cameraData.position[i];
 			}
 
-			if (mcd->roll[0] != camera.roll) {
-				mcd->roll[1] = camera.roll;
+			if (mcd->roll[0] != cameraData.roll) {
+				mcd->roll[1] = cameraData.roll;
 			} else {
 				mcd->roll[1] = 0.0f;
 			}
 
-			if (mcd->fov[0] != camera.fov) {
-				mcd->fov[1] = camera.fov;
+			if (mcd->fov[0] != cameraData.fov) {
+				mcd->fov[1] = cameraData.fov;
 			} else {
 				mcd->fov[1] = 0.0f;
 			}
@@ -1352,7 +1351,7 @@ int SgCamera::SetMapCamDat5(Ref<MapCamDat> mcd) {
 	Plyr_Wrk *plyr_wrk;
 
 	for (i = 0; i < 3; i++) {
-		mcd->p0[i] = camera.position[i] - plyr_wrk->get_global_position()[i];
+		mcd->p0[i] = cameraData.position[i] - plyr_wrk->get_global_position()[i];
 	}
 
 	for (i = 0; i < 3; i++) {
@@ -1362,8 +1361,8 @@ int SgCamera::SetMapCamDat5(Ref<MapCamDat> mcd) {
 	mcd->p2 = Vector3();
 	mcd->p3 = Vector3();
 
-	mcd->roll = Vector2(camera.roll, 0.0f);
-	mcd->fov = Vector2(camera.fov, 0.0f);
+	mcd->roll = Vector2(cameraData.roll, 0.0f);
+	mcd->fov = Vector2(cameraData.fov, 0.0f);
 
 	return 1;
 }

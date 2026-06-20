@@ -17,7 +17,6 @@ class MapCamDat : public Resource {
 	GDCLASS(MapCamDat, Resource)
 
 private:
-	RID map_cam_dat;
 	int cam_kind;
 
 protected:

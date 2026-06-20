@@ -114,10 +114,10 @@ private:
 	bool camera_focus_enabled;
 	int camera_focus_data;
 
-	int cd_edit_end;
-
 	/// The actual camera
-	RID camera_rid;
+	RID camera;
+
+	RID attributes;
 
 	friend class Viewport;
 	Viewport *viewport;
@@ -130,10 +130,13 @@ private:
 	// Culling layer mask
 	uint32_t layers = 0xfffff;
 
-	Ref<MapCamDat> mcd;
-	SgCameraData camera;
+	Ref<Environment> environment;
+	Ref<Compositor> compositor;
 
-	RayCast3D *interestPoint;
+	Ref<MapCamDat> mcd;
+	SgCameraData cameraData;
+
+	Node3D *interestNode;
 	Projection projectionMatrix;
 
 	// UI Stuff
@@ -174,10 +177,10 @@ public:
 	bool GetFocusEnabled() { return camera_focus_enabled; }
 	int GetFocusData() { return camera_focus_data; }
 
-	Vector3 GetPosition() { return camera.position; }
-	Vector3 GetInterest() { return camera.interest; }
+	Vector3 GetPosition() { return cameraData.position; }
+	Vector3 GetInterest() { return cameraData.interest; }
 
-	SgCameraData GetCameraData() { return camera; }
+	SgCameraData GetCameraData() { return cameraData; }
 
 	short *GetPlyrAdj() { return plyr_adj; }
 
@@ -198,19 +201,22 @@ public:
 	void SetCamPos4(SgCameraData *tc, MAP_CAM_INFO *mci);
 	void SetCamPos5(SgCameraData *tc, MAP_CAM_INFO *mci);
 
+	void SetPosition(Vector3 position) { cameraData.position = position; }
+	void SetInterest(Vector3 interest) { cameraData.interest = interest; }
+
 	// EDITOR CODE:
 	void SetMapCamDat(Ref<MapCamDat> m) { mcd = m; }
 	Ref<MapCamDat> GetMapCamDat() { return mcd; }
 
 	void CameraIdMoveCtrl();
 	void set_fov(real_t fov);
-	real_t get_fov() { return camera.fov; }
+	real_t get_fov() { return cameraData.fov; }
 
 	void set_nearz(real_t near);
-	real_t get_nearz() { return camera.nearz; }
+	real_t get_nearz() { return cameraData.nearz; }
 
 	void set_farz(real_t far);
-	real_t get_farz() { return camera.farz; }
+	real_t get_farz() { return cameraData.farz; }
 
 	int SetMapCamDat0(Ref<MapCamDat> mcd);
 	int SetMapCamDat1(Ref<MapCamDat> mcd);
