@@ -31,3 +31,6 @@ mcd = SubResource("MapCamDat_lc1oi")
 Position = Vector3(6.259487, 3.2072897, 31.83765)
 Interest = Vector3(-0.3823805, -5.32261, -67.57626)
 transform = Transform3D(0.9976776, -0.015099161, 0.06641868, 0.009399845, 0.99631107, 0.085299, -0.0674616, -0.084476575, 0.9941392, 6.259487, 3.2072897, 31.83765)
+
+[node name="OmniLight3D" type="OmniLight3D" parent="." index="4" unique_id=1818848214]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.0384502, 4.50696, 8.889101)

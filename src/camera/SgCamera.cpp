@@ -1,9 +1,11 @@
+#include "camera/SgCamera.h"
 #include "camera/CameraEffects.h"
 #include "camera/CameraMath.h"
 #include "camera/MapCamDat.h"
 #include "plyr_ctl.h"
 #include <sys/types.h>
 
+#include <cmath>
 #include <cstdint>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
@@ -74,6 +76,8 @@ SgCamera::SgCamera() {
 	camera_focus_enabled = false;
 	camera_focus_data = 0;
 
+	set_name("SgCamera");
+
 	cameraData = SgCameraData();
 	server = RenderingServer::get_singleton();
 	plyr_wrk = Object::cast_to<Plyr_Wrk>(get_parent());
@@ -83,10 +87,14 @@ SgCamera::SgCamera() {
 
 	attributes = RenderingServer::get_singleton()->camera_attributes_create();
 
-	boundingBox = memnew(Plane);
 	statusControl = memnew(Control);
 	pointStatus = memnew(Label);
 	interestNode = memnew(Node3D);
+
+	environment.instantiate();
+	environment->set_background(Environment::BG_CLEAR_COLOR);
+
+	set_environment(environment);
 
 	add_child(statusControl);
 	statusControl->set_anchors_preset(Control::PRESET_TOP_RIGHT);
@@ -122,21 +130,33 @@ void SgCamera::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("GetPosition"), &SgCamera::GetPosition);
 	ClassDB::bind_method(D_METHOD("SetPosition", "position"), &SgCamera::SetPosition);
+
 	ClassDB::bind_method(D_METHOD("GetInterest"), &SgCamera::GetInterest);
 	ClassDB::bind_method(D_METHOD("SetInterest", "interest"), &SgCamera::SetInterest);
+
 	ClassDB::bind_method(D_METHOD("get_fov"), &SgCamera::get_fov);
 	ClassDB::bind_method(D_METHOD("set_fov", "fov"), &SgCamera::set_fov);
+
 	ClassDB::bind_method(D_METHOD("get_farz"), &SgCamera::get_farz);
 	ClassDB::bind_method(D_METHOD("set_farz", "farz"), &SgCamera::set_farz);
+
 	ClassDB::bind_method(D_METHOD("set_nearz", "nearz"), &SgCamera::set_nearz);
 	ClassDB::bind_method(D_METHOD("get_nearz"), &SgCamera::get_nearz);
+
 	ClassDB::bind_method(D_METHOD("set_perspective", "fov", "z_near", "z_far"), &SgCamera::set_perspective);
+
+	ClassDB::bind_method(D_METHOD("set_cull_mask", "mask"), &SgCamera::set_cull_mask);
+	ClassDB::bind_method(D_METHOD("get_cull_mask"), &SgCamera::get_cull_mask);
+
+	ClassDB::bind_method(D_METHOD("set_cull_mask_value", "layer_number", "value"), &SgCamera::set_cull_mask_value);
+	ClassDB::bind_method(D_METHOD("get_cull_mask_value", "layer_number"), &SgCamera::get_cull_mask_value);
+
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "cull_mask", PROPERTY_HINT_LAYERS_3D_RENDER), "set_cull_mask", "get_cull_mask");
 
 	ClassDB::bind_method(D_METHOD("GetFocusData"), &SgCamera::GetFocusData);
 	ClassDB::bind_method(D_METHOD("GetEasingMode"), &SgCamera::GetEasingMode);
 	ClassDB::bind_method(D_METHOD("GetBlendFrames"), &SgCamera::GetBlendFrames);
 	ClassDB::bind_method(D_METHOD("GetFocusEnabled"), &SgCamera::GetFocusEnabled);
-
 	ClassDB::bind_method(D_METHOD("SetFocusData", "data"), &SgCamera::SetFocusData);
 	ClassDB::bind_method(D_METHOD("SetEasingMode", "mode"), &SgCamera::SetEasingMode);
 	ClassDB::bind_method(D_METHOD("SetBlendFrames", "frames"), &SgCamera::SetBlendFrames);
@@ -155,6 +175,34 @@ void SgCamera::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fov", PROPERTY_HINT_RANGE, "1,179,0.1,degrees"), "set_fov", "get_fov");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "nearz", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,exp,suffix:m"), "set_nearz", "get_nearz");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "farz", PROPERTY_HINT_RANGE, "0.01,4000,0.01,or_greater,exp,suffix:m"), "set_farz", "get_farz");
+}
+
+void SgCamera::set_cull_mask(uint32_t p_layers) {
+	layers = p_layers;
+	RenderingServer::get_singleton()->camera_set_cull_mask(camera, layers);
+	_update_camera_mode();
+}
+
+float SgCamera::GetMCLocalPosPer() {
+	return fabsf((plyr_wrk->get_global_position()[2] - box.x.x) / (box.x.x - box.z.x));
+}
+
+void SgCamera::set_cull_mask_value(int p_layer_number, bool p_value) {
+	ERR_FAIL_COND_MSG(p_layer_number < 1, "Render layer number must be between 1 and 20 inclusive.");
+	ERR_FAIL_COND_MSG(p_layer_number > 20, "Render layer number must be between 1 and 20 inclusive.");
+	uint32_t mask = get_cull_mask();
+	if (p_value) {
+		mask |= 1 << (p_layer_number - 1);
+	} else {
+		mask &= ~(1 << (p_layer_number - 1));
+	}
+	set_cull_mask(mask);
+}
+
+bool SgCamera::get_cull_mask_value(int p_layer_number) const {
+	ERR_FAIL_COND_V_MSG(p_layer_number < 1, false, "Render layer number must be between 1 and 20 inclusive.");
+	ERR_FAIL_COND_V_MSG(p_layer_number > 20, false, "Render layer number must be between 1 and 20 inclusive.");
+	return layers & (1 << (p_layer_number - 1));
 }
 
 void SgCamera::_notification(int p_what) {
@@ -216,6 +264,20 @@ Projection SgCamera::_get_camera_projection(real_t p_near) const {
 	cm.set_perspective(cameraData.fov, viewport_size.aspect(), p_near, cameraData.farz, keep_aspect == KEEP_WIDTH);
 
 	return cm;
+}
+
+void SgCamera::set_environment(const Ref<Environment> &p_environment) {
+	environment = p_environment;
+	if (environment.is_valid()) {
+		RenderingServer::get_singleton()->camera_set_environment(camera, environment->get_rid());
+	} else {
+		RenderingServer::get_singleton()->camera_set_environment(camera, RID());
+	}
+	_update_camera_mode();
+}
+
+Ref<Environment> SgCamera::get_environment() const {
+	return environment;
 }
 
 void SgCamera::DramaCameraReqCtrl() {
@@ -708,12 +770,10 @@ void SgCamera::set_current(bool p_enabled) {
 
 bool SgCamera::is_current() const {
 	if (is_inside_tree() && !is_part_of_edited_scene()) {
-		//return get_viewport()->get_camera_3d() == this;
+		//return get_viewport()->get_camera_3d() == camera;
 	} else {
 		return current;
 	}
-
-	godot::UtilityFunctions::print("is_current");
 	return 0;
 }
 
@@ -777,55 +837,12 @@ void SgCamera::KonwakuCamCtrl() {
 	cameraData.fov = 44.0f;
 }
 
-float SgCamera::GetMCLocalPosPer(u_short cn, u_char kind, u_char id) {
-	u_short xmin;
-	u_short xmax;
-	u_short zmin;
-	u_short zmax;
-
-	Point2 minMax;
-
-	u_char kind_tbl[4] = { 1, 2, 3, 4 };
-	static float min;
-	static float max;
-	static u_short req_cam_no_save = 0xFFFF;
-	static u_char req_cam_kind_save = 0xFF;
-
-	if (id == 0xff) {
-		req_cam_no_save = -1;
-		req_cam_kind_save = 0xff;
-
-		return 0.0f;
-	}
-
-	if (cn != req_cam_no_save || kind != req_cam_kind_save) {
-		req_cam_no_save = cn;
-		req_cam_kind_save = kind;
-
-		//MapCameraCdivideAB(cn, &xmin, &xmax, &zmin, &zmax, kind_tbl[kind]);
-
-		if (id == 0) {
-			min = xmin;
-			max = xmax;
-		} else {
-			min = zmin;
-			max = zmax;
-		}
-	}
-
-	if (id == 0) {
-		return __builtin_fabsf((plyr_wrk->bwp[0] - min) / (max - min));
-	}
-
-	return __builtin_fabsf((plyr_wrk->bwp[2] - min) / (max - min));
-}
-
 // Used ingame
 void SgCamera::SetCamPos0(SgCameraData *tc) {
 	Vector3 tv = Vector3();
 
 	// Replace this with the player's global position
-	GetMCLocalPosPer(0, 0, 0xff);
+	GetMCLocalPosPer();
 	tc->interest = Vector3((short)mcd->p0.y, mcd->p0.x, mcd->p0.z);
 
 	tv = Vector3(mcd->p1[0], (short)mcd->p1[1], mcd->p1[2]);
@@ -842,7 +859,7 @@ void SgCamera::SetCamPos1(SgCameraData *tc) {
 	Vector3 rot = plyr_wrk->get_global_rotation();
 	Transform3D t = get_global_transform();
 
-	GetMCLocalPosPer(0, 0, 0xff);
+	GetMCLocalPosPer();
 
 	tv = Vector3((short)mcd->p1[0], (short)mcd->p1[1], (short)mcd->p1[2]);
 	RotFvector(rot, t);
@@ -863,7 +880,7 @@ void SgCamera::SetCamPos2(SgCameraData *tc, MAP_CAM_INFO *mci) {
 	tv = Vector3((u_short)mcd->p0[0], (short)mcd->p0[1], (u_short)mcd->p0[2]);
 	tc->interest = tv;
 
-	per = GetMCLocalPosPer(mci->no, mci->kind, mcd->id);
+	per = GetMCLocalPosPer();
 
 	tv = Vector3i(((u_short)mcd->p2[0] - (u_short)mcd->p1[0]) * per,
 				  ((short)mcd->p2[1] - (short)mci->mcd->p1[1]) * per,
@@ -913,7 +930,7 @@ void SgCamera::SetCamPos3(SgCameraData *tc, MAP_CAM_INFO *mci) {
 
 	tc->interest = tv2;
 
-	per = GetMCLocalPosPer(mci->no, mci->kind, mci->mcd->id);
+	per = GetMCLocalPosPer();
 
 	tv2 = Vector3(((u_short)mci->mcd->p1[0] - (u_short)mci->mcd->p0[0]) * per,
 				  ((short)mci->mcd->p1[1] - (short)mci->mcd->p0[1]) * per,
@@ -952,7 +969,7 @@ void SgCamera::SetCamPos4(SgCameraData *tc, MAP_CAM_INFO *mci) {
 	float per;
 
 	// Bounds check
-	per = GetMCLocalPosPer(mci->no, mci->kind, mci->mcd->id);
+	per = GetMCLocalPosPer();
 
 	tv[0] = ((u_short)mci->mcd->p1[0] - (u_short)mci->mcd->p0[0]) * per;
 	tv[1] = ((short)mci->mcd->p1[1] - (short)mci->mcd->p0[1]) * per;
@@ -1005,7 +1022,7 @@ void SgCamera::SetCamPos5(SgCameraData *tc, MAP_CAM_INFO *mci) {
 
 	Transform3D t = get_global_transform();
 
-	GetMCLocalPosPer(0, 0x0, 0xff);
+	GetMCLocalPosPer();
 
 	if (mci->change != 0x0) {
 		tv = Vector3((short)mci->mcd->p1[0], (short)mci->mcd->p1[1], (short)mci->mcd->p1[2]);

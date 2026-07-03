@@ -5,12 +5,15 @@
 #include "plyr_ctl.h"
 
 #include <sys/types.h>
+#include <cstdint>
 #include <godot_cpp/classes/character_body3d.hpp>
+#include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/ray_cast3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/viewport.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/plane.hpp>
 #include <godot_cpp/variant/projection.hpp>
 #include <godot_cpp/variant/rid.hpp>
@@ -78,6 +81,11 @@ struct SgCameraData {
 	Vector3 yd;
 };
 
+struct AB {
+	Vector2i x; // minX, maxX
+	Vector2i z; // minZ, maxZ
+};
+
 enum KeepAspect {
 	KEEP_WIDTH,
 	KEEP_HEIGHT
@@ -123,11 +131,12 @@ private:
 	Viewport *viewport;
 	RenderingServer *server;
 
-	Plane *boundingBox;
+	/// TODO: Add widget to set box points
+	AB box;
 
 	Plyr_Wrk *plyr_wrk;
 
-	// Culling layer mask
+	/// Culling layer mask
 	uint32_t layers = 0xfffff;
 
 	Ref<Environment> environment;
@@ -169,6 +178,12 @@ public:
 	void DramaCameraReqCtrl();
 	void ClearDramaCamReq();
 
+	void set_cull_mask(uint32_t p_players);
+	u_int32_t get_cull_mask() const { return layers; }
+
+	void set_cull_mask_value(int p_layer_number, bool p_value);
+	bool get_cull_mask_value(int p_layer_number) const;
+
 	void CompleCameraPos(SgCameraData *tc, SgCameraData *oc, MAP_CAM_INFO *mci);
 	int CompleReqChk(MAP_CAM_INFO *mci);
 
@@ -189,7 +204,7 @@ public:
 	void SetFocusEnabled(bool focusEnabled) { camera_focus_enabled = focusEnabled; }
 	void SetFocusData(int data) { camera_focus_data = data; }
 
-	float GetMCLocalPosPer(u_short cn, u_char kind, u_char id);
+	float GetMCLocalPosPer();
 	Transform3D get_camera_transform() const;
 
 	int GetCameraInfo(MAP_CAM_INFO *mci);
@@ -207,6 +222,9 @@ public:
 	// EDITOR CODE:
 	void SetMapCamDat(Ref<MapCamDat> m) { mcd = m; }
 	Ref<MapCamDat> GetMapCamDat() { return mcd; }
+
+	void set_environment(const Ref<Environment> &p_environment);
+	Ref<Environment> get_environment() const;
 
 	void CameraIdMoveCtrl();
 	void set_fov(real_t fov);
