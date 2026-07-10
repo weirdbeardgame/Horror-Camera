@@ -8,7 +8,11 @@
 size = Vector3(1, 1, 0.99121094)
 
 [sub_resource type="MapCamDat" id="MapCamDat_lc1oi"]
-p1 = Vector3i(6, 3, 31)
+camType = 2
+pointID = 2
+p0 = Vector3i(40, -22, 74)
+p1 = Vector3i(1, 7, 73)
+p2 = Vector3i(1, 7, 20)
 
 [node name="Scene" unique_id=764998005 instance=ExtResource("1_lc1oi")]
 
@@ -18,7 +22,7 @@ shape = SubResource("WorldBoundaryShape3D_lc1oi")
 
 [node name="plyr_wrk" type="Plyr_Wrk" parent="." index="2" unique_id=943134997]
 speed = 2.0
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.420191, 3.2025876, 24.60505)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.420191, 3.2025876, 73.47553)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="plyr_wrk" index="0" unique_id=233118607]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.0043945313)
@@ -28,9 +32,17 @@ shape = SubResource("BoxShape3D_8od7v")
 
 [node name="SgCamera" type="SgCamera" parent="." index="3" unique_id=243096084]
 mcd = SubResource("MapCamDat_lc1oi")
-Position = Vector3(6.259487, 3.2072897, 31.83765)
-Interest = Vector3(-0.3823805, -5.32261, -67.57626)
-transform = Transform3D(0.9976776, -0.015099161, 0.06641868, 0.009399845, 0.99631107, 0.085299, -0.0674616, -0.084476575, 0.9941392, 6.259487, 3.2072897, 31.83765)
+Position = Vector3(1.3690457, 7.7175646, 20.960114)
+Interest = Vector3(40.996113, -22.753342, 22.06451)
+Box_X = Vector2i(800, -1500)
+Box_Z = Vector2i(1000, 1000)
+transform = Transform3D(-0.047259938, 0.6079842, -0.7925414, -0.02526879, 0.7924463, 0.6094181, 0.998563, 0.048827622, -0.022087941, 1.3690457, 7.7175646, 20.960114)
+
+[node name="Interest Point" type="Node3D" parent="SgCamera" index="1" unique_id=861095883]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -50)
+
+[node name="@Node3D@18609" type="Node3D" parent="SgCamera" index="2" unique_id=1544153102]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -50)
 
 [node name="OmniLight3D" type="OmniLight3D" parent="." index="4" unique_id=1818848214]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.0384502, 4.50696, 8.889101)

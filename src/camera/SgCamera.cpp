@@ -12,6 +12,8 @@
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/ray_cast3d.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
+#include <godot_cpp/classes/sprite3d.hpp>
+#include <godot_cpp/core/math.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/property_info.hpp>
@@ -39,6 +41,9 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
+
+#include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
 
 using namespace godot;
 
@@ -89,7 +94,6 @@ SgCamera::SgCamera() {
 
 	statusControl = memnew(Control);
 	pointStatus = memnew(Label);
-	interestNode = memnew(Node3D);
 
 	environment.instantiate();
 	environment->set_background(Environment::BG_CLEAR_COLOR);
@@ -105,15 +109,26 @@ SgCamera::SgCamera() {
 	set_perspective(44.0f, 0.1f, 32768.0f);
 	RenderingServer::get_singleton()->camera_set_cull_mask(camera, layers);
 
-	add_child(interestNode);
-	interestNode->set_position(Vector3(0, 0, -100));
-
 	if (attributes.is_valid()) {
 		server->camera_set_camera_attributes(camera, attributes);
 	}
 
 	set_notify_transform(true);
 	set_disable_scale(true);
+}
+
+void SgCamera::_ready() {
+	godot::UtilityFunctions::print("my extension is initialised");
+	viewport = get_viewport();
+	if (get_owner() != nullptr)
+		// ToDo, GetBody from Area3D
+		plyr_wrk = get_owner()->get_node<Plyr_Wrk>("plyr_wrk");
+
+	interestNode = memnew(Node3D);
+	interestNode->set_name("Interest Point");
+	interestNode->set_position(Vector3(0, 0, -50));
+	add_child(interestNode);
+	interestNode->set_owner(get_tree()->get_edited_scene_root());
 }
 
 void SgCamera::_bind_methods() {
@@ -162,6 +177,12 @@ void SgCamera::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("SetBlendFrames", "frames"), &SgCamera::SetBlendFrames);
 	ClassDB::bind_method(D_METHOD("SetFocusEnabled", "focusEnabled"), &SgCamera::SetFocusEnabled);
 
+	ClassDB::bind_method(D_METHOD("SetABX", "x"), &SgCamera::SetABX);
+	ClassDB::bind_method(D_METHOD("SetABZ", "z"), &SgCamera::SetABZ);
+
+	ClassDB::bind_method(D_METHOD("GetABX"), &SgCamera::GetABX);
+	ClassDB::bind_method(D_METHOD("GetABZ"), &SgCamera::GetABZ);
+
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "current"), "set_current", "is_current");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "blend_frames"), "SetBlendFrames", "GetBlendFrames");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "camera_easing_mode"), "SetEasingMode", "GetEasingMode");
@@ -172,37 +193,12 @@ void SgCamera::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "Position"), "SetPosition", "GetPosition");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "Interest"), "SetInterest", "GetInterest");
 
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "Box_X"), "SetABX", "GetABX");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "Box_Z"), "SetABZ", "GetABZ");
+
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fov", PROPERTY_HINT_RANGE, "1,179,0.1,degrees"), "set_fov", "get_fov");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "nearz", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,exp,suffix:m"), "set_nearz", "get_nearz");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "farz", PROPERTY_HINT_RANGE, "0.01,4000,0.01,or_greater,exp,suffix:m"), "set_farz", "get_farz");
-}
-
-void SgCamera::set_cull_mask(uint32_t p_layers) {
-	layers = p_layers;
-	RenderingServer::get_singleton()->camera_set_cull_mask(camera, layers);
-	_update_camera_mode();
-}
-
-float SgCamera::GetMCLocalPosPer() {
-	return fabsf((plyr_wrk->get_global_position()[2] - box.x.x) / (box.x.x - box.z.x));
-}
-
-void SgCamera::set_cull_mask_value(int p_layer_number, bool p_value) {
-	ERR_FAIL_COND_MSG(p_layer_number < 1, "Render layer number must be between 1 and 20 inclusive.");
-	ERR_FAIL_COND_MSG(p_layer_number > 20, "Render layer number must be between 1 and 20 inclusive.");
-	uint32_t mask = get_cull_mask();
-	if (p_value) {
-		mask |= 1 << (p_layer_number - 1);
-	} else {
-		mask &= ~(1 << (p_layer_number - 1));
-	}
-	set_cull_mask(mask);
-}
-
-bool SgCamera::get_cull_mask_value(int p_layer_number) const {
-	ERR_FAIL_COND_V_MSG(p_layer_number < 1, false, "Render layer number must be between 1 and 20 inclusive.");
-	ERR_FAIL_COND_V_MSG(p_layer_number > 20, false, "Render layer number must be between 1 and 20 inclusive.");
-	return layers & (1 << (p_layer_number - 1));
 }
 
 void SgCamera::_notification(int p_what) {
@@ -255,6 +251,51 @@ void SgCamera::_notification(int p_what) {
 			}
 		} break;
 	}
+}
+
+void SgCamera::set_cull_mask(uint32_t p_layers) {
+	layers = p_layers;
+	RenderingServer::get_singleton()->camera_set_cull_mask(camera, layers);
+	_update_camera_mode();
+}
+
+float SgCamera::GetMCLocalPosPer() {
+	const float x0 = box.x[0];
+	const float x1 = box.x[1];
+	const float min = std::min(x0, x1);
+	const float max = std::max(x0, x1);
+	const float range = max - min;
+
+	godot::UtilityFunctions::print("min: ", min);
+	godot::UtilityFunctions::print("max: ", max);
+	godot::UtilityFunctions::print("range: ", range);
+
+	if (range <= 0.0f)
+		return 0.0f;
+
+	const float position = plyr_wrk->get_global_position()[2];
+
+	godot::UtilityFunctions::print("Position: ", position);
+
+	return Math::clamp((position - min) / range, 0.0f, 1.0f);
+}
+
+void SgCamera::set_cull_mask_value(int p_layer_number, bool p_value) {
+	ERR_FAIL_COND_MSG(p_layer_number < 1, "Render layer number must be between 1 and 20 inclusive.");
+	ERR_FAIL_COND_MSG(p_layer_number > 20, "Render layer number must be between 1 and 20 inclusive.");
+	uint32_t mask = get_cull_mask();
+	if (p_value) {
+		mask |= 1 << (p_layer_number - 1);
+	} else {
+		mask &= ~(1 << (p_layer_number - 1));
+	}
+	set_cull_mask(mask);
+}
+
+bool SgCamera::get_cull_mask_value(int p_layer_number) const {
+	ERR_FAIL_COND_V_MSG(p_layer_number < 1, false, "Render layer number must be between 1 and 20 inclusive.");
+	ERR_FAIL_COND_V_MSG(p_layer_number > 20, false, "Render layer number must be between 1 and 20 inclusive.");
+	return layers & (1 << (p_layer_number - 1));
 }
 
 Projection SgCamera::_get_camera_projection(real_t p_near) const {
@@ -641,14 +682,6 @@ void SgCamera::NormalCameraCtrl() {
 	set_transform(trans);
 }
 
-void SgCamera::_ready() {
-	godot::UtilityFunctions::print("my extension is initialised");
-	viewport = get_viewport();
-	if (get_owner() != nullptr)
-		// ToDo, GetBody from Area3D
-		plyr_wrk = get_owner()->get_node<Plyr_Wrk>("plyr_wrk");
-}
-
 void SgCamera::_request_camera_update() {
 	_update_camera();
 }
@@ -699,7 +732,12 @@ void SgCamera::_process(double delta) {
 
 	t = get_global_transform();
 
-	if (Engine::get_singleton()->is_editor_hint()) {
+	if (!Engine::get_singleton()->is_editor_hint()) {
+		NormalCameraCtrl();
+		//effects.QuakeCamera();
+	}
+
+	else {
 		cam_id_move.i = interestNode->get_global_position();
 
 		GetTrgtRot(cameraData.position, cameraData.interest, &cam_id_move.rot_x, 1);
@@ -716,11 +754,6 @@ void SgCamera::_process(double delta) {
 		mcd->type = 0;
 		//cd_step = 0;
 		//cam_id = 0;
-	}
-
-	else {
-		NormalCameraCtrl();
-		//effects.QuakeCamera();
 	}
 }
 
@@ -744,7 +777,6 @@ void SgCamera::make_current() {
 	godot::UtilityFunctions::print("make_current");
 
 	if (!is_inside_tree()) {
-		godot::UtilityFunctions::print("returned");
 		return;
 	}
 }
@@ -875,12 +907,14 @@ void SgCamera::SetCamPos1(SgCameraData *tc) {
 void SgCamera::SetCamPos2(SgCameraData *tc, MAP_CAM_INFO *mci) {
 	Vector3 tv;
 	Vector3 bv;
-	float per;
+	float per = 0.0f;
 
 	tv = Vector3((u_short)mcd->p0[0], (short)mcd->p0[1], (u_short)mcd->p0[2]);
 	tc->interest = tv;
 
 	per = GetMCLocalPosPer();
+
+	godot::UtilityFunctions::print("Per: ", per);
 
 	tv = Vector3i(((u_short)mcd->p2[0] - (u_short)mcd->p1[0]) * per,
 				  ((short)mcd->p2[1] - (short)mci->mcd->p1[1]) * per,
@@ -1131,41 +1165,26 @@ int SgCamera::SetMapCamDat1(Ref<MapCamDat> mcd) {
 
 int SgCamera::SetMapCamDat2(Ref<MapCamDat> mcd, int id) {
 	int end;
-	static Ref<MapCamDat> tmpd;
+	static MapCamDat *tmpd;
 
-	tmpd.instantiate();
+	if (!tmpd) {
+		tmpd = memnew(MapCamDat);
+	}
 
 	end = 0;
-
-	for (int i = 0; i < 3; i++) {
-		tmpd->p0[i] = (u_short)cameraData.interest[i];
-	}
-
-	for (int i = 0; i < 3; i++) {
-		tmpd->p1[i] = (u_short)cameraData.position[i];
-	}
 
 	switch (mcd->pointID) {
 		case 0:
 			mcd->type = 2;
-
-			for (int i = 0; i < 3; i++) {
-				tmpd->p0[i] = (u_short)(int)cameraData.interest[i];
-			}
-
-			for (int i = 0; i < 3; i++) {
-				tmpd->p1[i] = cameraData.position[i];
-			}
-
+			tmpd->p0 = cameraData.interest;
+			tmpd->p1 = cameraData.position;
 			mcd->roll[0] = cameraData.roll;
 			mcd->fov[0] = cameraData.fov;
 
 			mcd->pointID++;
 			break;
 		case 1:
-			for (int i = 0; i < 3; i++) {
-				tmpd->p2[i] = cameraData.position[i];
-			}
+			tmpd->p2 = cameraData.position;
 
 			if (mcd->roll[0] != cameraData.roll) {
 				mcd->roll[1] = cameraData.roll;

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "CameraMath.h"
 #include "MapCamDat.h"
 #include "plyr_ctl.h"
 
@@ -21,12 +20,14 @@
 #include <godot_cpp/variant/typed_array.hpp>
 
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
 // UI Includes
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/label3d.hpp>
+#include <godot_cpp/classes/sprite3d.hpp>
 
 #define CAMERA_NO (tbl)((tbl >> 8) & 0x1ff)
 #define CAMERA_ACTIVE (tbl)(tbl & 0xff)
@@ -235,6 +236,12 @@ public:
 
 	void set_farz(real_t far);
 	real_t get_farz() { return cameraData.farz; }
+
+	void SetABX(Vector2i x) { box.x = x; }
+	void SetABZ(Vector2i z) { box.z = z; }
+
+	Vector2i GetABX() { return box.x; }
+	Vector2i GetABZ() { return box.z; }
 
 	int SetMapCamDat0(Ref<MapCamDat> mcd);
 	int SetMapCamDat1(Ref<MapCamDat> mcd);
