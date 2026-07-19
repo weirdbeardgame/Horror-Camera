@@ -3,31 +3,13 @@
 #include "MapCamDat.h"
 #include "plyr_ctl.h"
 
-#include <sys/types.h>
-#include <cstdint>
-#include <godot_cpp/classes/character_body3d.hpp>
-#include <godot_cpp/classes/node2d.hpp>
-#include <godot_cpp/classes/node3d.hpp>
-#include <godot_cpp/classes/ray_cast3d.hpp>
-#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/input_event_key.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
-#include <godot_cpp/classes/viewport.hpp>
-#include <godot_cpp/variant/array.hpp>
-#include <godot_cpp/variant/plane.hpp>
-#include <godot_cpp/variant/projection.hpp>
-#include <godot_cpp/variant/rid.hpp>
-#include <godot_cpp/variant/transform3d.hpp>
-#include <godot_cpp/variant/typed_array.hpp>
-
 #include <godot_cpp/core/class_db.hpp>
-#include <godot_cpp/variant/vector2i.hpp>
-#include <godot_cpp/variant/vector3.hpp>
 
 // UI Includes
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/label.hpp>
-#include <godot_cpp/classes/label3d.hpp>
-#include <godot_cpp/classes/sprite3d.hpp>
 
 #define CAMERA_NO (tbl)((tbl >> 8) & 0x1ff)
 #define CAMERA_ACTIVE (tbl)(tbl & 0xff)
@@ -249,6 +231,8 @@ public:
 	int SetMapCamDat3(Ref<MapCamDat> mcd, int id);
 	int SetMapCamDat4(Ref<MapCamDat> mcd, int id);
 	int SetMapCamDat5(Ref<MapCamDat> mcd);
+
+	void _input(const Ref<InputEvent> &event);
 
 	~SgCamera();
 };

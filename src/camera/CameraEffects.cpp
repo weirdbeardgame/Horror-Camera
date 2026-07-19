@@ -20,6 +20,7 @@ int CameraEffects::QuakeCamera() {
 	qk_p = &quake;
 
 	if (qk_p->req == 0) {
+		godot::UtilityFunctions::print("No quake");
 		return 0;
 	}
 	if (qk_p->cnt >= qk_p->all_cnt) {
@@ -41,7 +42,7 @@ int CameraEffects::QuakeCamera() {
 		}
 	}
 
-	xd = camera.GetCameraData().zd.cross(camera.GetCameraData().yd);
+	xd = camera->GetCameraData().zd.cross(camera->GetCameraData().yd);
 
 	for (i = 0; i < 2; i++) {
 		dat = qk_p->pow[i];
@@ -56,14 +57,19 @@ int CameraEffects::QuakeCamera() {
 			v2 = v2 * (qk_p->cnt / 30.0f);
 		}
 
-		val[i][0] = (xd[0] * v0) + (camera.GetCameraData().yd[0] * v1) + (camera.GetCameraData().zd[0] * v2);
-		val[i][1] = (xd[1] * v0) + (camera.GetCameraData().yd[1] * v1) + (camera.GetCameraData().zd[1] * v2);
-		val[i][2] = (xd[2] * v0) + (camera.GetCameraData().yd[2] * v1) + (camera.GetCameraData().zd[2] * v2);
+		val[i][0] = (xd[0] * v0) + (camera->GetCameraData().yd[0] * v1) + (camera->GetCameraData().zd[0] * v2);
+		val[i][1] = (xd[1] * v0) + (camera->GetCameraData().yd[1] * v1) + (camera->GetCameraData().zd[1] * v2);
+		val[i][2] = (xd[2] * v0) + (camera->GetCameraData().yd[2] * v1) + (camera->GetCameraData().zd[2] * v2);
 		val[i][3] = 0;
 	}
 
-	camera.GetCameraData().position += val[0];
-	camera.GetCameraData().interest += val[1];
+	godot::UtilityFunctions::print("VAl0", val[0]);
+	godot::UtilityFunctions::print("VAl1", val[1]);
+
+	camera->GetCameraData().position += val[0];
+	camera->GetCameraData().interest += val[1];
+
+	return 1;
 }
 
 void CameraEffects::StopQuake() {
@@ -78,6 +84,8 @@ void CameraEffects::ReqQuake(float pow, u_int time, u_int loop, u_int stop_flg) 
 	quake.all_cnt = time;
 	quake.loop = loop;
 	quake.req = 1;
+
+	godot::UtilityFunctions::print("REQ");
 }
 
 void CameraEffects::CallFocus(int type, int wait, int gap) {

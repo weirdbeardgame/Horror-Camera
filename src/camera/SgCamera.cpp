@@ -7,44 +7,11 @@
 
 #include <cmath>
 #include <cstdint>
-#include <godot_cpp/classes/control.hpp>
-#include <godot_cpp/classes/global_constants.hpp>
-#include <godot_cpp/classes/label.hpp>
-#include <godot_cpp/classes/node2d.hpp>
-#include <godot_cpp/classes/ray_cast3d.hpp>
-#include <godot_cpp/classes/rendering_server.hpp>
-#include <godot_cpp/classes/sprite3d.hpp>
-#include <godot_cpp/core/math.hpp>
-#include <godot_cpp/core/memory.hpp>
-#include <godot_cpp/core/object.hpp>
-#include <godot_cpp/core/property_info.hpp>
-#include <godot_cpp/variant/basis.hpp>
-#include <godot_cpp/variant/plane.hpp>
-#include <godot_cpp/variant/rect2.hpp>
-#include <godot_cpp/variant/transform3d.hpp>
-#include <godot_cpp/variant/utility_functions.hpp>
-#include <godot_cpp/variant/variant.hpp>
-
-#include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/engine.hpp>
-#include <godot_cpp/classes/node3d.hpp>
-#include <godot_cpp/classes/viewport.hpp>
-
-#include <godot_cpp/core/class_db.hpp>
-#include <godot_cpp/core/engine_ptrcall.hpp>
-#include <godot_cpp/core/error_macros.hpp>
-
-#include <godot_cpp/classes/area3d.hpp>
-#include <godot_cpp/classes/camera_attributes.hpp>
-#include <godot_cpp/classes/compositor.hpp>
 #include <godot_cpp/classes/environment.hpp>
-#include <godot_cpp/classes/world3d.hpp>
-#include <godot_cpp/variant/vector2.hpp>
-#include <godot_cpp/variant/vector3.hpp>
-#include <godot_cpp/variant/vector3i.hpp>
-
-#include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/viewport.hpp>
 
 using namespace godot;
 
@@ -70,7 +37,7 @@ static u_char req_rc_fade = 0;
 static u_char drm_cam_req = 0;
 static u_short drm_cam_tm = 0;
 
-//static CameraEffects effects;
+static CameraEffects *effects;
 
 SgCamera::SgCamera() {
 	isActive = true;
@@ -130,6 +97,8 @@ void SgCamera::_ready() {
 	interestNode->set_position(Vector3(0, 0, -50));
 	add_child(interestNode);
 	interestNode->set_owner(get_tree()->get_edited_scene_root());
+
+	effects = new CameraEffects(this);
 }
 
 void SgCamera::_bind_methods() {
@@ -267,16 +236,16 @@ float SgCamera::GetMCLocalPosPer() {
 	const float max = x1; //std::max(x0, x1);
 	const float range = max - min;
 
-	godot::UtilityFunctions::print("min: ", min);
-	godot::UtilityFunctions::print("max: ", max);
-	godot::UtilityFunctions::print("range: ", range);
+	//godot::UtilityFunctions::print("min: ", min);
+	//godot::UtilityFunctions::print("max: ", max);
+	//godot::UtilityFunctions::print("range: ", range);
 
 	if (range <= 0.0f)
 		return 0.0f;
 
 	const float position = plyr_wrk->get_global_position()[2];
 
-	godot::UtilityFunctions::print("Position: ", position);
+	//godot::UtilityFunctions::print("Position: ", position);
 
 	return fabsf((position - min) / range);
 }
@@ -680,6 +649,8 @@ void SgCamera::NormalCameraCtrl() {
 	Transform3D trans = get_global_transform();
 	trans.set_origin(cameraData.position);
 
+	look_at(cameraData.interest);
+
 	set_transform(trans);
 }
 
@@ -735,7 +706,7 @@ void SgCamera::_process(double delta) {
 
 	if (!Engine::get_singleton()->is_editor_hint()) {
 		NormalCameraCtrl();
-		//effects.QuakeCamera();
+		effects->QuakeCamera();
 	}
 
 	else {
@@ -915,10 +886,10 @@ void SgCamera::SetCamPos2(SgCameraData *tc, MAP_CAM_INFO *mci) {
 
 	per = GetMCLocalPosPer();
 
-	godot::UtilityFunctions::print("Per: ", per);
+	//godot::UtilityFunctions::print("Per: ", per);
 
 	tv = Vector3(((float)mcd->p2[0] - (float)mcd->p1[0]) * per,
-				 ((float)mcd->p2[1] - (short)mci->mcd->p1[1]) * per,
+				 ((float)mcd->p2[1] - (float)mci->mcd->p1[1]) * per,
 				 ((float)mcd->p2[2] - (float)mcd->p1[2]) * per);
 
 	bv = Vector3((float)mcd->p1[0], (float)mcd->p1[1], (float)mcd->p1[2]);
@@ -1402,4 +1373,12 @@ int SgCamera::SetMapCamDat5(Ref<MapCamDat> mcd) {
 	mcd->fov = Vector2(cameraData.fov, 0.0f);
 
 	return 1;
+}
+
+void SgCamera::_input(const Ref<InputEvent> &event) {
+	const InputEventKey *key_event = Object::cast_to<const InputEventKey>(*event);
+
+	if (key_event->get_keycode() == KEY_Q) {
+		effects->ReqQuake(100, 5, 1, 1);
+	}
 }
