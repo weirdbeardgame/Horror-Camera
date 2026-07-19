@@ -20,10 +20,10 @@ void Plyr_Wrk::_bind_methods() {
 void Plyr_Wrk::_process(double delta) {
 	if (!Engine::get_singleton()->is_editor_hint()) {
 		if (Input::get_singleton()->is_action_pressed("ui_up")) {
-			set_position(get_position() + Vector3(0, 0, speed * (float)delta));
+			set_position(get_position() + Vector3(0, 0, -speed * (float)delta));
 		}
 		if (Input::get_singleton()->is_action_pressed("ui_down")) {
-			set_position(get_position() + Vector3(0, 0, -speed * (float)delta));
+			set_position(get_position() + Vector3(0, 0, speed * (float)delta));
 		}
 	}
 }

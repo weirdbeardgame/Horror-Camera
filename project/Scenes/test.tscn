@@ -32,11 +32,11 @@ shape = SubResource("BoxShape3D_8od7v")
 
 [node name="SgCamera" type="SgCamera" parent="." index="3" unique_id=243096084]
 mcd = SubResource("MapCamDat_lc1oi")
-Position = Vector3(1.3690457, 7.7175646, 20.960114)
-Interest = Vector3(40.996113, -22.753342, 22.06451)
-Box_X = Vector2i(800, -1500)
+Position = Vector3(0.87788177, 7.7175646, 73.36724)
+Interest = Vector3(40.504948, -22.753342, 74.47164)
+Box_X = Vector2i(150, 800)
 Box_Z = Vector2i(1000, 1000)
-transform = Transform3D(-0.047259938, 0.6079842, -0.7925414, -0.02526879, 0.7924463, 0.6094181, 0.998563, 0.048827622, -0.022087941, 1.3690457, 7.7175646, 20.960114)
+transform = Transform3D(-0.047259938, 0.6079842, -0.7925414, -0.02526879, 0.7924463, 0.6094181, 0.998563, 0.048827622, -0.022087941, 0.87788177, 7.7175646, 73.36724)
 
 [node name="Interest Point" type="Node3D" parent="SgCamera" index="1" unique_id=861095883]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -50)

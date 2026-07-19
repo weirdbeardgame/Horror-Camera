@@ -83,8 +83,8 @@ struct SgCameraData {
 };
 
 struct AB {
-	Vector2i x; // minX, maxX
-	Vector2i z; // minZ, maxZ
+	Vector2 x; // minX, maxX
+	Vector2 z; // minZ, maxZ
 };
 
 enum KeepAspect {
@@ -237,11 +237,11 @@ public:
 	void set_farz(real_t far);
 	real_t get_farz() { return cameraData.farz; }
 
-	void SetABX(Vector2i x) { box.x = x; }
-	void SetABZ(Vector2i z) { box.z = z; }
+	void SetABX(Vector2 x) { box.x = x; }
+	void SetABZ(Vector2 z) { box.z = z; }
 
-	Vector2i GetABX() { return box.x; }
-	Vector2i GetABZ() { return box.z; }
+	Vector2 GetABX() { return box.x; }
+	Vector2 GetABZ() { return box.z; }
 
 	int SetMapCamDat0(Ref<MapCamDat> mcd);
 	int SetMapCamDat1(Ref<MapCamDat> mcd);

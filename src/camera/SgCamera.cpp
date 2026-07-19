@@ -10,6 +10,7 @@
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/label.hpp>
+#include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/ray_cast3d.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/sprite3d.hpp>
@@ -193,8 +194,8 @@ void SgCamera::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "Position"), "SetPosition", "GetPosition");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "Interest"), "SetInterest", "GetInterest");
 
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "Box_X"), "SetABX", "GetABX");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "Box_Z"), "SetABZ", "GetABZ");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "Box_X"), "SetABX", "GetABX");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "Box_Z"), "SetABZ", "GetABZ");
 
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fov", PROPERTY_HINT_RANGE, "1,179,0.1,degrees"), "set_fov", "get_fov");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "nearz", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,exp,suffix:m"), "set_nearz", "get_nearz");
@@ -262,8 +263,8 @@ void SgCamera::set_cull_mask(uint32_t p_layers) {
 float SgCamera::GetMCLocalPosPer() {
 	const float x0 = box.x[0];
 	const float x1 = box.x[1];
-	const float min = std::min(x0, x1);
-	const float max = std::max(x0, x1);
+	const float min = x0; //std::min(x0, x1);
+	const float max = x1; //std::max(x0, x1);
 	const float range = max - min;
 
 	godot::UtilityFunctions::print("min: ", min);
@@ -277,7 +278,7 @@ float SgCamera::GetMCLocalPosPer() {
 
 	godot::UtilityFunctions::print("Position: ", position);
 
-	return Math::clamp((position - min) / range, 0.0f, 1.0f);
+	return fabsf((position - min) / range);
 }
 
 void SgCamera::set_cull_mask_value(int p_layer_number, bool p_value) {
@@ -907,22 +908,22 @@ void SgCamera::SetCamPos1(SgCameraData *tc) {
 void SgCamera::SetCamPos2(SgCameraData *tc, MAP_CAM_INFO *mci) {
 	Vector3 tv;
 	Vector3 bv;
-	float per = 0.0f;
+	float per;
 
-	tv = Vector3((u_short)mcd->p0[0], (short)mcd->p0[1], (u_short)mcd->p0[2]);
+	tv = Vector3((float)mcd->p0[0], (float)mcd->p0[1], (float)mcd->p0[2]);
 	tc->interest = tv;
 
 	per = GetMCLocalPosPer();
 
 	godot::UtilityFunctions::print("Per: ", per);
 
-	tv = Vector3i(((u_short)mcd->p2[0] - (u_short)mcd->p1[0]) * per,
-				  ((short)mcd->p2[1] - (short)mci->mcd->p1[1]) * per,
-				  ((u_short)mcd->p2[2] - (u_short)mcd->p1[2]) * per);
+	tv = Vector3(((float)mcd->p2[0] - (float)mcd->p1[0]) * per,
+				 ((float)mcd->p2[1] - (short)mci->mcd->p1[1]) * per,
+				 ((float)mcd->p2[2] - (float)mcd->p1[2]) * per);
 
-	bv = Vector3((u_short)mcd->p1[0], (short)mcd->p1[1], (u_short)mcd->p1[2]);
+	bv = Vector3((float)mcd->p1[0], (float)mcd->p1[1], (float)mcd->p1[2]);
 
-	tc->position = bv + tv;
+	tc->position = (bv + tv);
 
 	if (mcd->roll[1] != 0.0f) {
 		bv[0] = mcd->roll[1] - mcd->roll[0];
